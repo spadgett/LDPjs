@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project basedir="." default="build" name="LDPjs">
+    
+  <property name="debuglevel" value="source,lines,vars" />
+  <property name="target" value="1.5" />
+  <property name="source" value="1.5" />
+  <property name="warname" value="${ant.project.name}.war" />
+  <property name="artifact_dir" value="${ARCHIVE_DIR}"/>
+  
+  <path id="classpathDir">
+    <pathelement location="bin" />
+  </path>
+  
+  <target name="init">
+    <mkdir dir="bin" />
+    <copy includeemptydirs="false" todir="bin">
+      <fileset dir="src">
+        <exclude name="**/*.java" />
+      </fileset>
+    </copy>
+    <copy includeemptydirs="false" todir="bin">
+      <fileset dir="WebContent" />
+    </copy>
+	<echo message="Copy files to ${artifact_dir} for deployment"/>
+	<copy todir="${artifact_dir}">
+      <fileset file="manifest.yml" />
+    </copy>
+  </target>
+  
+  <target name="clean">
+    <delete dir="bin" />
+  </target>
+  
+  <target name="build" depends="build-project,build-war" />
+  
+  <target name="cleanall" depends="clean" />
+  
+  <target name="build-project" depends="init">
+    <echo message="${ant.project.name}: ${ant.file}" />
+    <javac debug="true" debuglevel="${debuglevel}" destdir="bin" source="${source}" target="${target}" includeantruntime="false">
+      <src path="src" />
+    	<classpath>
+	      	<pathelement path="${classpathDir}"/>
+	      	<fileset dir="lib">
+	      	  <include name="**/*.jar"/>
+	      	</fileset>
+	   </classpath>
+    </javac>
+  </target>
+  
+  <target name="build-war" depends="build-project">
+    <war destfile="${artifact_dir}/${warname}" basedir="bin" />
+  </target>
+
+  
+</project>
