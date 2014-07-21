@@ -7,6 +7,7 @@
 
 var express = require('express');
 var rdfstore = require('rdfstore');
+var url = require('url');
 
 // setup middleware
 var app = express();
@@ -45,12 +46,29 @@ if (storage === 'mongodb') {
    store = rdfstore.create();
 }
 
+store.registerDefaultProfileNamespaces();
+store.registerDefaultNamespace('http://www.w3.org/ns/ldp#', 'ldp');
+
+// fill in req.rawBody
+app.use(function(req, res, next) {
+	req.rawBody = '';
+	req.setEncoding('utf8');
+
+	req.on('data', function(chunk) { 
+		req.rawBody += chunk;
+	});
+
+	req.on('end', function() {
+		next();
+	});
+});
+
 app.use(function(err, req, res, next){
 	console.error(err.stack);
 	res.send(500, 'Something broke!');
 });
 
-app.route('/resources/*')
+app.route('/r/*')
 .all(function(req, res, next) {
 	res.links({
 		type: 'http://www.w3.org/ns/ldp#Resource'
@@ -58,11 +76,29 @@ app.route('/resources/*')
 	next();
 })
 .get(function(req, res, next) {
-	res.send('GET ' + req.path);
+	var uri = url.resolve(app.get('base'), req.url);
+	console.log('GET: ' + uri);
+	store.graph(uri, function(success, graph) {
+		res.format({
+			'text/turtle': function() {
+				res.type('text/turtle').send(graph.toNT());
+			}
+		});
+	});
 })
 .put(function(req, res, next) {
-	res.send('PUT ' + req.path);
+	var uri = url.resolve(app.get('base'), req.url);
+	console.log('PUT: ' + uri);
+	console.log(req.rawBody);
+	if (req.is('text/turtle')) {
+		store.load('text/turtle', req.rawBody, uri, function() {
+			res.send('got it, thanks');
+		});
+	} else {
+		res.status(415, 'why not turtle?');
+	}
 })
+
 .post(function(req, res, next) {
 	res.send('POST ' + req.path);
 })
@@ -85,6 +121,24 @@ var appInfo = JSON.parse(process.env.VCAP_APPLICATION || "{}");
 var host = (process.env.VCAP_APP_HOST || 'localhost');
 // The port on the DEA for communication with the application:
 var port = (process.env.VCAP_APP_PORT || 3000);
+
+// The base URL.
+// FIXME: https?
+var base = url.format({
+	protocol: 'http',
+	hostname: host,
+	port: port,
+});
+
+// The root LDP container.
+var rootContainer = url.resolve(base, '/r/');
+console.log('Using root container: ' + rootContainer);
+
+// Remember the URLs as app properties.
+app.set('base', base);
+app.set('rootContainer', rootContainer);
+
+
 // Start server
 app.listen(port, host);
 console.log('App started on port ' + port);
