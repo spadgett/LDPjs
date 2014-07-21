@@ -6,7 +6,7 @@
 // and jade as template engine (http://jade-lang.com/).
 
 var express = require('express');
-var rdfstore = require('rdfstore');
+//var rdfstore = require('rdfstore');
 
 // setup middleware
 var app = express();
@@ -15,7 +15,7 @@ app.set('view engine', 'jade');
 app.set('views', __dirname + '/views'); //optional since express defaults to CWD/views
 
 // setup rdfstore/mongo
-var storage='mongodb';
+/* var storage='mongodb';
 var store;
 
 if (storage === 'mongodb') {
@@ -30,7 +30,7 @@ if (storage === 'mongodb') {
                    });
 } else {
    store = rdfstore.create();
-}
+} */
 
 app.use(function(err, req, res, next){
 	console.error(err.stack);
