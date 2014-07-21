@@ -10,9 +10,6 @@ var rdfstore = require('rdfstore');
 
 // setup middleware
 var app = express();
-app.use(app.router);
-app.use(express.errorHandler());
-app.use(express.static(__dirname + '/public')); //setup static public directory
 app.set('view engine', 'jade');
 app.set('views', __dirname + '/views'); //optional since express defaults to CWD/views
 
@@ -34,6 +31,30 @@ if (storage === 'mongodb') {
    store = rdfstore.create();
 }
 
+app.use(function(err, req, res, next){
+	console.error(err.stack);
+	res.send(500, 'Something broke!');
+});
+
+app.route('/resources/*')
+.all(function(req, res, next) {
+	res.links({
+		type: '<http://www.w3.org/ns/ldp#Resource'
+	});
+	next();
+})
+.get(function(req, res, next) {
+	res.send('GET ' + req.path);
+})
+.put(function(req, res, next) {
+	res.send('PUT ' + req.path);
+})
+.post(function(req, res, next) {
+	res.send('POST ' + req.path);
+})
+.delete(function(req, res, next) {
+	res.send('DELETE ' + req.path);
+});
 
 // render index page
 app.get('/', function(req, res){
