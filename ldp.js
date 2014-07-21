@@ -10,6 +10,7 @@ var rdfstore = require('rdfstore');
 
 // setup middleware
 var app = express();
+app.use(express.static(__dirname + '/public'));
 app.set('view engine', 'jade');
 app.set('views', __dirname + '/views'); //optional since express defaults to CWD/views
 
