@@ -1,7 +1,7 @@
 {
-	"name": "NodejsStarterApp",
+	"name": "LDP.js",
 	"version": "0.0.1",
-	"description": "A sample nodejs app for Bluemix",
+	"description": "A Node.js reference app for LDP",
 	"dependencies": {
 		"express": "3.4.7",
 		"jade": "1.1.4"

@@ -1,7 +1,6 @@
-# Node.js Starter Application
+# LDP.js
 
-Bluemix provides a Node.js starter application as a template so that you can add your code and push the changes back to the Bluemix environment.
-
+Reference implementation of W3C Linked Data Platform (LDP) using Node.js, rdfstore+MongoDB
 
 ## Files
 
@@ -26,5 +25,7 @@ The Node.js starter application has files as below:
 *   package.json
 
 	This file is required by the Node.js environment. It specifies this Node.js project name, dependencies, and other configurations of your Node.js application.
+
+## Overviews
 
 
