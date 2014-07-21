@@ -6,7 +6,7 @@
 // and jade as template engine (http://jade-lang.com/).
 
 var express = require('express');
-//var rdfstore = require('rdfstore');
+var rdfstore = require('rdfstore');
 
 // setup middleware
 var app = express();
@@ -15,22 +15,35 @@ app.set('view engine', 'jade');
 app.set('views', __dirname + '/views'); //optional since express defaults to CWD/views
 
 // setup rdfstore/mongo
-/* var storage='mongodb';
+var storage='mongodb';
 var store;
+
+if (process.env.VCAP_SERVICES) {
+	var env = JSON.parse(process.env.VCAP_SERVICES);
+	var mongo = env['mongodb-2.2'][0].credentials;
+} else {
+	var mongo = {
+	      "username" : "user1",
+	      "password" : "secret",
+	      "hostname" : "localhost",
+	      "host" : "127.0.0.1",
+	      "port" : 27017
+	};
+}
 
 if (storage === 'mongodb') {
    store = new rdfstore.Store({persistent:true, 
                     engine:'mongodb', 
                     name:'ldpjs', 
                     overwrite:false,    
-                    mongoDomain:'localhost', 
-                    mongoPort:27017 
+                    mongoDomain:mongo.hostname, 
+                    mongoPort:mongo.port 
                    }, function(ldpjsDB){
                    	   store = ldpjsDB;
                    });
 } else {
    store = rdfstore.create();
-} */
+}
 
 app.use(function(err, req, res, next){
 	console.error(err.stack);
@@ -67,11 +80,6 @@ app.get('/', function(req, res){
 var appInfo = JSON.parse(process.env.VCAP_APPLICATION || "{}");
 // TODO: Get application information and use it in your app.
 
-// VCAP_SERVICES contains all the credentials of services bound to
-// this application. For details of its content, please refer to
-// the document or sample of each service.
-var services = JSON.parse(process.env.VCAP_SERVICES || "{}");
-// TODO: Get service credentials and communicate with bluemix services.
 
 // The IP address of the Cloud Foundry DEA (Droplet Execution Agent) that hosts this application:
 var host = (process.env.VCAP_APP_HOST || 'localhost');
