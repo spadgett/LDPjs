@@ -39,7 +39,7 @@ app.use(function(err, req, res, next){
 app.route('/resources/*')
 .all(function(req, res, next) {
 	res.links({
-		type: '<http://www.w3.org/ns/ldp#Resource'
+		type: 'http://www.w3.org/ns/ldp#Resource'
 	});
 	next();
 })
