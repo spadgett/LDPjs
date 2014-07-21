@@ -1,6 +1,6 @@
 /*jshint node:true*/
 
-// app.js
+// ldp.js
 // This file contains the server side JavaScript code for your application.
 // This sample application uses express as web application framework (http://expressjs.com/),
 // and jade as template engine (http://jade-lang.com/).

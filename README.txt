@@ -11,7 +11,7 @@ The Node.js starter application has files as below:
 
 	This file describes the Next Steps for getting started with this template.
 
-*   app.js
+*   ldp.js
 
 	This file contains the server side JavaScript code for your application written using the Node.js API
 

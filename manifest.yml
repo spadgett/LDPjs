@@ -2,7 +2,7 @@ applications:
 - disk_quota: 1024M
   host: ldpjs
   name: LDP.js
-  command: node app.js
+  command: node ldp.js
   path: .
   domain: mybluemix.net
   instances: 1
