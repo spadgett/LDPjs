@@ -26,6 +26,16 @@ The Node.js starter application has files as below:
 
 	This file is required by the Node.js environment. It specifies this Node.js project name, dependencies, and other configurations of your Node.js application.
 
-## Overviews
+## RDFStore / MongoDB
+
+* This app will connect and use DB 'ldpjs'
+
+* To connect from prompt:
+
+** mongo
+** use ldpjs
+** db.quads.find()
+** it  
+  This dumps all the quads 
 
 
