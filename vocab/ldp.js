@@ -1,4 +1,14 @@
-var ns = exports.ns = 'http://www.w3.org/ns/ldp#';
-exports.prefix = 'ldp';
-exports.Resource = ns + 'Resource';
-exports.RDFSource = ns + 'RDFSource';
+function define(name, value) {
+    Object.defineProperty(exports, name, {
+        value:      value,
+        enumerable: true
+    });
+}
+
+var ns = 'http://www.w3.org/ns/ldp#';
+define('ns', ns);
+define('prefix', 'ldp');
+
+// Resources
+define('Resource', ns + 'Resource');
+define('RDFSource', ns + 'RDFSource');
