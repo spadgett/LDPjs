@@ -24,37 +24,43 @@ if (process.env.VCAP_SERVICES) {
 	var mongo = env['mongodb-2.2'][0].credentials;
 } else {
 	var mongo = {
-	      "username" : "user1",
-	      "password" : "secret",
-	      "hostname" : "localhost",
-	      "host" : "127.0.0.1",
-	      "port" : 27017
+		  "hostname" : "localhost",
+		  "host" : "127.0.0.1",
+		  "port" : 27017
 	};
 }
 
 if (storage === 'mongodb') {
-   store = new rdfstore.Store({persistent:true, 
-                    engine:'mongodb', 
-                    name:'ldpjs', 
-                    overwrite:false,    
-                    mongoDomain:mongo.hostname, 
-                    mongoPort:mongo.port 
-                   }, function(ldpjsDB){
-                   	   store = ldpjsDB;
-                   });
+	new rdfstore.Store({
+		persistent: true,
+		engine: 'mongodb',
+		name: 'ldpjs',
+		overwrite: false,
+		mongoDomain:
+			(mongo.username && monog.password)
+				? mongo.username + ":" + mongo.password + "@" + mongo.hostname
+				: mongo.hostname,
+		mongoPort: mongo.port
+   }, function(ldpjsDB){
+	   store = ldpjsDB;
+	   registerNamespaces();
+   });
 } else {
    store = rdfstore.create();
+   registerNamespaces();
 }
 
-store.registerDefaultProfileNamespaces();
-store.registerDefaultNamespace('http://www.w3.org/ns/ldp#', 'ldp');
+function registerNamespaces() {
+	store.registerDefaultProfileNamespaces();
+	store.registerDefaultNamespace('http://www.w3.org/ns/ldp#', 'ldp');
+}
 
 // fill in req.rawBody
 app.use(function(req, res, next) {
 	req.rawBody = '';
 	req.setEncoding('utf8');
 
-	req.on('data', function(chunk) { 
+	req.on('data', function(chunk) {
 		req.rawBody += chunk;
 	});
 
