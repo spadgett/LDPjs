@@ -23,6 +23,11 @@ module.exports = function(app, store) {
 				return;
 			}
 
+			if (!graph.length) {
+				res.send(404);
+				return;
+			}
+
 			// add ldp:RDFSource in addition to ldp:Resource
 			res.links({
 				type: ldp.RDFSource
