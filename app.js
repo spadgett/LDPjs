@@ -56,6 +56,12 @@ function registerNamespaces() {
 	store.registerDefaultNamespace('http://www.w3.org/ns/ldp#', 'ldp');
 }
 
+// fill in full request URL
+app.use(function(req, res, next) {
+	req.fullURL = req.protocol + '://' + req.get('host') + req.originalUrl;
+	next();
+});
+
 // fill in req.rawBody
 app.use(function(req, res, next) {
 	req.rawBody = '';
@@ -83,9 +89,8 @@ app.route('/r/*')
 	next();
 })
 .get(function(req, res, next) {
-	var uri = url.resolve(app.get('base'), req.url);
-	console.log('GET: ' + uri);
-	store.graph(uri, function(success, graph) {
+	console.log('GET ' + req.path);
+	store.graph(req.fullURL, function(success, graph) {
 		res.format({
 			'text/turtle': function() {
 				var text = graph.toNT();
@@ -101,15 +106,14 @@ app.route('/r/*')
 	});
 })
 .put(function(req, res, next) {
-	var uri = url.resolve(app.get('base'), req.url);
-	console.log('PUT: ' + uri);
+	console.log('PUT ' + req.path);
 	if (req.is('text/turtle')) {
-		store.load('text/turtle', req.rawBody, uri, function(success) {
+		store.load('text/turtle', req.rawBody, req.fullURL, function(success) {
 			res.send(success ? 204 : 400);
 		});
 	} else if (req.is('application/ld+json')) {
 		var jsonld = JSON.parse(req.rawBody);
-		store.load('application/ld+json', jsonld, uri, function(success) {
+		store.load('application/ld+json', jsonld, req.fullURL, function(success) {
 			res.send(success ? 204 : 400);
 		});
 	} else {
@@ -142,23 +146,6 @@ var appInfo = JSON.parse(process.env.VCAP_APPLICATION || "{}");
 var host = (process.env.VCAP_APP_HOST || 'localhost');
 // The port on the DEA for communication with the application:
 var port = (process.env.VCAP_APP_PORT || 3000);
-
-// The base URL.
-// FIXME: https?
-var base = url.format({
-	protocol: 'http',
-	hostname: host,
-	port: port,
-});
-
-// The root LDP container.
-var rootContainer = url.resolve(base, '/r/');
-console.log('Using root container: ' + rootContainer);
-
-// Remember the URLs as app properties.
-app.set('base', base);
-app.set('rootContainer', rootContainer);
-
 
 // Start server
 app.listen(port, host);
