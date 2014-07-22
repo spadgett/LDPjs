@@ -1,11 +1,11 @@
 module.exports = function(app, store) {
 	var rdfserver = require('rdfstore/server.js');
+	var ldp = require('./vocab/ldp.js');
 
 	var resource = app.route('/r/*')
-
 	resource.all(function(req, res, next) {
 		res.links({
-			type: 'http://www.w3.org/ns/ldp#Resource'
+			type: ldp.Resource
 		});
 		next();
 	});
@@ -13,6 +13,15 @@ module.exports = function(app, store) {
 	resource.get(function(req, res, next) {
 		console.log('GET ' + req.path);
 		store.graph(req.fullURL, function(success, graph) {
+			if (!success) {
+				res.send(500);
+				return;
+			}
+
+			res.links({
+				type: ldp.RDFSource
+			});
+
 			res.format({
 				'text/turtle': function() {
 					var text = graph.toNT();
