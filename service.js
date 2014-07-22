@@ -40,17 +40,7 @@ module.exports = function(app, store) {
 	resource.put(function(req, res, next) {
 		console.log('PUT ' + req.path);
 
-		var content, mediaType;
-		if (req.is(media.turtle) || req.is(media.text) || req.is(media.n3)) {
-			content = req.rawBody;
-			mediaType = media.turtle;
-		} else if (req.is(media.jsonld) || req.is(media.json)) {
-			content = JSON.parse(req.rawBody);
-			mediaType = media.jsonld;
-		} else {
-			res.status(415);
-			return;
-		}
+		var body = getBody(req);
 
 		// Get the graph to see if the resource exists
 		store.graph(req.fullURL, function(success, graph) {
@@ -58,7 +48,7 @@ module.exports = function(app, store) {
 				res.send(500);
 			}
 
-			store.load(mediaType, content, req.fullURL, function(success) {
+			store.load(body.mediaType, body.content, req.fullURL, function(success) {
 				if (success) {
 					if (isEmpty(graph)) {
 						// PUT to create
@@ -113,5 +103,23 @@ module.exports = function(app, store) {
 
 	function isEmpty(graph) {
 		return !graph.length;
+	}
+
+	function getBody(req) {
+		if (req.is(media.turtle) || req.is(media.text) || req.is(media.n3)) {
+			return {
+				content: req.rawBody,
+				mediaType: media.turtle
+			};
+		}
+
+		if (req.is(media.jsonld) || req.is(media.json)) {
+			return {
+				content: JSON.parse(req.rawBody),
+				mediaType: media.jsonld
+			};
+		}
+
+		return null;
 	}
 };
