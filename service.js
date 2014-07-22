@@ -23,7 +23,7 @@ module.exports = function(app, store) {
 				return;
 			}
 
-			if (!graph.length) {
+			if (isEmpty(graph)) {
 				res.send(404);
 				return;
 			}
@@ -39,19 +39,40 @@ module.exports = function(app, store) {
 
 	resource.put(function(req, res, next) {
 		console.log('PUT ' + req.path);
-		// TODO: Return 201 when PUT creates a resource
+
+		var content, mediaType;
 		if (req.is(media.turtle) || req.is(media.text) || req.is(media.n3)) {
-			store.load(media.turtle, req.rawBody, req.fullURL, function(success) {
-				res.send(success ? 204 : 400);
-			});
+			content = req.rawBody;
+			mediaType = media.turtle;
 		} else if (req.is(media.jsonld) || req.is(media.json)) {
-			var json = JSON.parse(req.rawBody);
-			store.load(media.jsonld, json, req.fullURL, function(success) {
-				res.send(success ? 204 : 400);
-			});
+			content = JSON.parse(req.rawBody);
+			mediaType = media.jsonld;
 		} else {
 			res.status(415);
+			return;
 		}
+
+		// Get the graph to see if the resource exists
+		store.graph(req.fullURL, function(success, graph) {
+			if (!success) {
+				res.send(500);
+			}
+
+			store.load(mediaType, content, req.fullURL, function(success) {
+				if (success) {
+					if (isEmpty(graph)) {
+						// PUT to create
+						res.location(req.fullURL).send(201);
+					} else {
+						// PUT to update
+						res.send(204);
+					}
+				} else {
+					// FIXME: is 400 always correct?
+					res.send(400);
+				}
+			});
+		});
 	});
 
 	resource.post(function(req, res, next) {
@@ -88,5 +109,9 @@ module.exports = function(app, store) {
 		writer[media.json] = writeJson;
 
 		res.format(writer);
+	}
+
+	function isEmpty(graph) {
+		return !graph.length;
 	}
 };
