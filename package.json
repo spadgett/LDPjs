@@ -4,7 +4,6 @@
 	"description": "A Node.js reference app for LDP",
 	"dependencies": {
 		"express": "4.6.1",
-		"jade": "1.4.2",
 		"rdfstore": "0.8.1"
 	},
 	"engines": {

@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<!--
+  Copyright (c) 2013, 2014 IBM Corporation.
+ 
+   All rights reserved. This program and the accompanying materials
+   are made available under the terms of the Eclipse Public License v1.0
+   and Eclipse Distribution License v. 1.0 which accompanies this distribution.
+   
+   The Eclipse Public License is available at http://www.eclipse.org/legal/epl-v10.html
+   and the Eclipse Distribution License is available at
+   http://www.eclipse.org/org/documents/edl-v10.php.
+   
+   Contributors:
+   
+      Samuel Padgett - initial API and implementation
+      Samuel Padgett - work with hosts other than localhost
+      Samuel Padgett - more robust d3 XHR requests and some clean-up
+-->
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <title>Linked Data Platform Reference Implementation</title>
+    <link rel="stylesheet" type="text/css" href="style.css">
+    <script src="http://d3js.org/d3.v3.min.js" type="text/javascript"></script>
+    <script src="//ajax.googleapis.com/ajax/libs/dojo/1.8.3/dojo/dojo.js" data-dojo-config="async: true" type="text/javascript"></script>
+</head>
+
+<body>
+
+    <a href="http://www.w3.org/2012/ldp/" title="W3C">
+        <img width="5%" height="5%" src="http://w3c.github.io/ldp-testsuite/images/w3c.png" alt="W3C" style="float: left;" />
+    </a>
+    <h1><a href="http://www.w3.org/2012/ldp/" title="LDP">Linked Data Platform</a> Reference Implementation</h1>
+    <p>Details at <a href="http://eclipse.org/lyo/">Eclipse Lyo</a>
+    </p>
+
+    <div id="visualization"></div>
+
+    <div style="float: right;">
+        <input type="checkbox" id="showConfig">
+        <label for="showConfig">Show configuration resources</label>
+    </div>
+
+    <div class="tabs">
+        <a href="#" id="getTab" style="font-weight: bold;">GET</a> |
+        <a href="#" id="putTab">PUT</a> |
+        <a href="#" id="postTab">POST</a> |
+        <a href="#" id="deleteTab">DELETE</a>
+    </div>
+
+    <div id="get" class="tabContent">
+        <div>
+            <form id="getForm" action="">
+                <input type="url" id="getURI" class="urlInput" value="" required>
+                <select id="getMediaType">
+                    <option>text/turtle</option>
+                    <option>application/json</option>
+                    <option>application/rdf+xml</option>
+                </select>
+                <input type="submit" value="GET">
+            </form>
+        </div>
+        <div id="resources" class="fixed">Loading...</div>
+    </div>
+
+    <div id="put" class="tabContent" style="display: none;">
+        <form id="putForm" action="">
+            <div id="putResult" style="display: none;" class="message"></div>
+            <label for="putURI">Resource:</label>
+            <input type="url" id="putURI" class="urlInput" value="" required>
+            <textarea id="putContent" class="textArea" required cols="" rows=""></textarea>
+            <label for="putMediaType">Media Type:</label>
+            <select id="putMediaType">
+                <option>text/turtle</option>
+                <option>application/json</option>
+                <option>application/rdf+xml</option>
+            </select>
+            <input type="submit" value="PUT">
+        </form>
+    </div>
+
+    <div id="post" class="tabContent" style="display: none;">
+        <form id="postForm" action="">
+            <div id="postResult" style="display: none;" class="message"></div>
+            <textarea id="postContent" class="textArea" required cols="" rows="">
+@prefix dcterms: &lt;http://purl.org/dc/terms/&gt;.
+@prefix rdf:     &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#&gt;.
+@prefix bt:      &lt;http://example.org/vocab/bugtracker#&gt;.
+
+&lt;&gt; a bt:Bug;
+      dcterms:title "Product C crashes when shutting down.";
+      bt:isInState "New" . 
+            </textarea>
+            <label for="postMediaType">Media Type:</label>
+            <select id="postMediaType">
+                <option>text/turtle</option>
+                <option>application/json</option>
+                <option>application/rdf+xml</option>
+            </select>
+            <input type="submit" value="POST">
+        </form>
+    </div>
+
+    <div id="delete" class="tabContent" style="display: none;">
+        <div id="deleteResult" style="display: none;" class="message"></div>
+        <form id="deleteForm" action="">
+            <label for="deleteURI">Resource:</label>
+            <input type="url" id="deleteURI" class="urlInput" value="" required>
+            <input type="submit" value="DELETE">
+        </form>
+    </div>
+
+    <script type="text/javascript">
+        require(["dojo/_base/xhr",
+            "dojo/_base/event",
+            "dojo/dom",
+            "dojo/on",
+            "dojo/query",
+            "dojo/ready",
+            "dojo/NodeList-dom"
+        ], function (xhr, event, dom, on, query, ready) {
+            function updateGetURI() {
+                // Use an <a> element to go from a relative to an absolute URI.
+                var a = document.createElement('a');
+                a.href = '/r/';
+                var uri = a.href;
+
+                // Update the input field for GET.
+
+                // Note: Assumes ldp.rooturi is set to the same base URI used to load this page.
+                // If it's not, we can't make requests anyway because of the browser same origin policy.
+
+                dom.byId('getURI').value = uri;
+            }
+
+            function showTab(tab, content) {
+                query('.tabs a').style('font-weight', 'normal');
+                query('.tabContent').style('display', 'none');
+                dom.byId(tab).style.fontWeight = 'bold';
+                dom.byId(content).style.display = '';
+            }
+
+            function refresh() {
+                visualize();
+                getResource();
+            }
+
+            function getResource(e) {
+                if (e) {
+                    event.stop(e);
+                }
+
+                getInternal();
+            }
+
+            function getInternal(callback) {
+                xhr.get({
+                    url: dom.byId('getURI').value,
+                    headers: {
+                        Accept: dom.byId('getMediaType').value
+                    },
+                    handleAs: 'text',
+                    load: function (data) {
+                        var n = dom.byId('resources');
+                        n.innerHTML = '';
+                        n.appendChild(document.createTextNode(data));
+                        if (callback) {
+                            callback();
+                        }
+                    },
+                    error: function (error, ioArgs) {
+                        alert('Could not get resource (status ' + ioArgs.xhr.status + ')');
+                    }
+                });
+            }
+
+            function putResource(e) {
+                event.stop(e);
+                xhr.put({
+                    url: dom.byId('putURI').value,
+                    headers: {
+                        'Content-Type': dom.byId('putMediaType').value
+                    },
+                    putData: dom.byId('putContent').value,
+                    load: function (data, ioArgs) {
+                        var n = dom.byId('putResult');
+                        n.innerHTML = '';
+                        n.appendChild(document.createTextNode('Updated resource ' + dom.byId('putURI').value));
+                        n.style.display = '';
+                        refresh();
+                    },
+                    error: function (error, ioArgs) {
+                        var n = dom.byId('putResult');
+                        n.innerHTML = '<span class="error">Could not update resource (' + ioArgs.xhr.status + ')</span>';
+                        n.style.display = '';
+                    }
+                });
+            }
+
+            function postResource(e) {
+                event.stop(e);
+                xhr.post({
+                    url: '/r/',
+                    headers: {
+                        'Content-Type': dom.byId('postMediaType').value
+                    },
+                    postData: dom.byId('postContent').value,
+                    load: function (data, ioArgs) {
+                        var l = ioArgs.xhr.getResponseHeader('Location');
+                        var n = dom.byId('postResult');
+                        n.innerHTML = '';
+                        n.appendChild(document.createTextNode('Created resource ' + l));
+                        n.style.display = '';
+                        refresh();
+                    },
+                    error: function (error, ioArgs) {
+                        var n = dom.byId('postResult');
+                        n.innerHTML = '<span class="error">Could not create resource (' + ioArgs.xhr.status + ')</span>';
+                        n.style.display = '';
+                    }
+                });
+            }
+
+            function deleteResource(e) {
+                event.stop(e);
+
+                xhr.del({
+                    url: dom.byId('deleteURI').value,
+                    load: function (data) {
+                        var n = dom.byId('deleteResult');
+                        n.innerHTML = '';
+                        n.appendChild(document.createTextNode('Deleted resource ' + dom.byId('putURI').value));
+                        n.style.display = '';
+                        refresh();
+                    },
+                    error: function (error, ioArgs) {
+                        var n = dom.byId('deleteResult');
+                        n.innerHTML = '<span class="error">Could not delete resource (' + ioArgs.xhr.status + ')</span>';
+                        n.style.display = '';
+                        n.innerHTML = '';
+                    }
+                })
+            }
+
+            function visualize() {
+                dom.byId('visualization').innerHTML = '';
+                var width = Math.max(window.innerWidth - 50, 600),
+                    height = 400;
+
+                var color = d3.scale.category20();
+
+                var force = d3.layout.force()
+                    .charge(-150)
+                    .linkDistance(175)
+                    .size([width, height]);
+
+                var svg = d3.select("#visualization").append("svg")
+                    .attr("width", width)
+                    .attr("height", height);
+
+                d3.xhr("/v?showConfig=" + dom.byId('showConfig').checked)
+                    .header('Accept', 'application/json')
+                    .response(function (request) {
+                        return JSON.parse(request.responseText);
+                    })
+                    .get(function (error, graph) {
+                        if (error) return console.warn(error);
+                        force
+                            .nodes(graph.nodes)
+                            .links(graph.links)
+                            .start();
+
+                        var link = svg.selectAll(".link")
+                            .data(graph.links)
+                            .enter().append("line")
+                            .attr("class", "link")
+                            .style("stroke-width", function(d) {
+                                return Math.sqrt(d.value);
+                            });
+
+                        var node = svg.selectAll(".node")
+                            .data(graph.nodes)
+                            .enter().append("g")
+                            .attr("class", "node")
+                            .call(force.drag);
+
+                        node.append("circle").attr("r", 5)
+                            .style("fill", function (d) {
+                                return color(d.group);
+                            })
+
+                        node.append("text")
+                            .attr("x", 12)
+                            .attr("dy", ".35em")
+                            .text(function (d) {
+                                return d.name;
+                            });
+
+                        force.on("tick", function () {
+                            link.attr("x1", function (d) {
+                                    return d.source.x;
+                                })
+                                .attr("y1", function (d) {
+                                    return d.source.y;
+                                })
+                                .attr("x2", function (d) {
+                                    return d.target.x;
+                                })
+                                .attr("y2", function (d) {
+                                    return d.target.y;
+                                });
+
+                            node.attr("transform", function (d) {
+                                return "translate(" + d.x + "," + d.y + ")";
+                            });
+                        });
+                    });
+            }
+
+            ready(function () {
+                updateGetURI();
+
+                on(dom.byId('getTab'), 'click', function (e) {
+                    event.stop(e);
+                    showTab('getTab', 'get');
+                });
+                on(dom.byId('putTab'), 'click', function (e) {
+                    event.stop(e);
+                    showTab('putTab', 'put');
+                });
+                on(dom.byId('postTab'), 'click', function (e) {
+                    event.stop(e);
+                    showTab('postTab', 'post');
+                });
+                on(dom.byId('deleteTab'), 'click', function (e) {
+                    event.stop(e);
+                    showTab('deleteTab', 'delete');
+                });
+                on(dom.byId('getForm'), 'submit', getResource);
+                on(dom.byId('putForm'), 'submit', putResource);
+                on(dom.byId('postForm'), 'submit', postResource);
+                on(dom.byId('deleteForm'), 'submit', deleteResource);
+                on(dom.byId('showConfig'), 'change', visualize);
+
+                // Call getResource() once before visualize() so that the root container can initialize.
+                getInternal(visualize);
+            });
+        });
+    </script>
+
+</body>
+
+</html>

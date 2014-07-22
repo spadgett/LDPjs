@@ -1,0 +1,73 @@
+html {
+	color: #000;
+	background: #FFF;
+}
+
+body {
+	font-family: "Helvetica Neue",Helvetica,Arial,Verdana,Geneva,sans-serif;
+	color: #333;
+}
+
+.tabs {
+	margin-bottom: 0.5em;
+}
+
+.fixed {
+	font-family:monospace;
+	padding: 1em;
+	border: 1px dashed #2f6fab;
+	color: black;
+	background-color: #f9f9f9;
+	line-height: 1.1em;
+	white-space: pre;
+	overflow-x: scroll;
+	margin-top: 0.5em;
+}
+
+.urlInput {
+	width: 40em;
+}
+
+.message {
+	margin-bottom: 0.5em;
+}
+
+.textArea {
+	display: block;
+	width: 100%;
+	height: 20em;
+ 	-webkit-box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    box-sizing: border-box;
+    margin-bottom: 0.5em;
+}
+
+.error {
+	color: red;
+}
+
+circle {
+	stroke: #fff;
+	stroke-width: 1.5px;
+}
+
+.link {
+	stroke: #999;
+	stroke-opacity: .6;
+}
+
+text {
+  fill: #000;
+  font: 10px sans-serif;
+  pointer-events: none;
+}
+
+label {
+	font-size: 80%;
+}
+
+input[type=checkbox] {
+    vertical-align: middle;
+    position: relative;
+    bottom: 1px;
+}

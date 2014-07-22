@@ -2,8 +2,7 @@
 
 // app.js
 // This file contains the server side JavaScript code for your application.
-// This sample application uses express as web application framework (http://expressjs.com/),
-// and jade as template engine (http://jade-lang.com/).
+// This sample application uses express as web application framework (http://expressjs.com/).
 
 var express = require('express');
 var url = require('url');
@@ -11,7 +10,6 @@ var url = require('url');
 // setup middleware
 var app = express();
 app.use(express.static(__dirname + '/public'));
-app.set('view engine', 'jade');
 app.set('views', __dirname + '/views'); //optional since express defaults to CWD/views
 
 // fill in full request URL
@@ -34,14 +32,11 @@ app.use(function(req, res, next) {
 	});
 });
 
-// initialize database and set up LDP services when ready
+// initialize database and set up LDP services and viz when ready
 require('./db.js').init(function(store) {
 	require('./service.js')(app, store);
-});
-
-// render index page
-app.get('/', function(req, res){
-	res.render('index');
+	require('./viz.js')(app, store);
+	require('./sparql.js')(app, store);
 });
 
 // error handling
