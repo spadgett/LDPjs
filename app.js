@@ -102,6 +102,7 @@ app.route('/r/*')
 })
 .put(function(req, res, next) {
 	var uri = url.resolve(app.get('base'), req.url);
+	console.log('PUT: ' + uri);
 	if (req.is('text/turtle')) {
 		store.load('text/turtle', req.rawBody, uri, function(success) {
 			res.send(success ? 204 : 400);
@@ -119,7 +120,11 @@ app.route('/r/*')
 	res.send('POST ' + req.path);
 })
 .delete(function(req, res, next) {
-	res.send('DELETE ' + req.path);
+	var uri = url.resolve(app.get('base'), req.url);
+	console.log('DELETE: ' + uri);
+	store.clear(uri, function(success) {
+		res.send(success ? 204 : 400);
+	});
 });
 
 // render index page
