@@ -87,7 +87,9 @@ app.route('/r/*')
 	store.graph(uri, function(success, graph) {
 		res.format({
 			'text/turtle': function() {
-				res.type('text/turtle').send(graph.toNT());
+				var text = graph.toNT();
+				res.writeHead(200, { 'Content-Type': 'text/turtle' });
+				res.end(new Buffer(text), 'utf-8');
 			}
 		});
 	});
