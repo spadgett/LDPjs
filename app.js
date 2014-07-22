@@ -37,7 +37,7 @@ if (storage === 'mongodb') {
 		name: 'ldpjs',
 		overwrite: false,
 		mongoDomain:
-			(mongo.username && monog.password)
+			(mongo.username && mongo.password)
 				? mongo.username + ":" + mongo.password + "@" + mongo.hostname
 				: mongo.hostname,
 		mongoPort: mongo.port
