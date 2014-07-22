@@ -35,7 +35,7 @@ if (storage === 'mongodb') {
 	new rdfstore.Store({
 		persistent: true,
 		engine: 'mongodb',
-		name: 'ldpjs',
+		name: mongo.db || 'ldpjs',
 		overwrite: false,
 		mongoDomain:
 			(mongo.username && mongo.password)
