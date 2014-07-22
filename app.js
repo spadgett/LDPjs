@@ -1,12 +1,13 @@
 /*jshint node:true*/
 
-// ldp.js
+// app.js
 // This file contains the server side JavaScript code for your application.
 // This sample application uses express as web application framework (http://expressjs.com/),
 // and jade as template engine (http://jade-lang.com/).
 
 var express = require('express');
 var rdfstore = require('rdfstore');
+var rdfserver = require('rdfstore/server.js');
 var url = require('url');
 
 // setup middleware
@@ -90,23 +91,30 @@ app.route('/r/*')
 				var text = graph.toNT();
 				res.writeHead(200, { 'Content-Type': 'text/turtle' });
 				res.end(new Buffer(text), 'utf-8');
+			},
+			'application/ld+json': function() {
+				var jsonld = rdfserver.Server.graphToJSONLD(graph, store.rdf);
+				res.writeHead(200, { "Content-Type":"application/ld+json" });
+				res.end(new Buffer(JSON.stringify(jsonld)), 'utf-8');
 			}
 		});
 	});
 })
 .put(function(req, res, next) {
 	var uri = url.resolve(app.get('base'), req.url);
-	console.log('PUT: ' + uri);
-	console.log(req.rawBody);
 	if (req.is('text/turtle')) {
-		store.load('text/turtle', req.rawBody, uri, function() {
-			res.send('got it, thanks');
+		store.load('text/turtle', req.rawBody, uri, function(success) {
+			res.send(success ? 204 : 400);
+		});
+	} else if (req.is('application/ld+json')) {
+		var jsonld = JSON.parse(req.rawBody);
+		store.load('application/ld+json', jsonld, uri, function(success) {
+			res.send(success ? 204 : 400);
 		});
 	} else {
-		res.status(415, 'why not turtle?');
+		res.status(415);
 	}
 })
-
 .post(function(req, res, next) {
 	res.send('POST ' + req.path);
 })
