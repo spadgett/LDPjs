@@ -6,14 +6,15 @@ module.exports = function(app, store) {
 
 	resource.get(function(req, res, next) {
 		console.log('GET ' + req.path);
-		// res.json(stubData);
+		res.json(stubData);
+		/*
 		store.graph("http://localhost:3000/r/foo", function(success, graph) {
 			if (!success) {
 				res.send(500);
 				return;
 			}
 			res.json(graph);
-		});
+		}); */
 	});
 	
 	var stubData = { 
@@ -352,55 +353,55 @@ module.exports = function(app, store) {
 		  "nodes" : [ 
 		      { 
 		        "group" : 0 ,
-		        "name" : "/resources/bc/res180"
+		        "name" : "/MOCKUP/bc/res180"
 		      } ,
 		      { 
 		        "group" : 0 ,
-		        "name" : "/resources/bc/res295"
+		        "name" : "/MOCKUP/bc/res295"
 		      } ,
 		      { 
 		        "group" : 0 ,
-		        "name" : "/resources/dc-invmbr-diffmr/res31"
+		        "name" : "/MOCKUP/dc-invmbr-diffmr/res31"
 		      } ,
 		      { 
 		        "group" : 0 ,
-		        "name" : "/resources/bc/res113"
+		        "name" : "/MOCKUP/bc/res113"
 		      } ,
 		      { 
 		        "group" : 0 ,
-		        "name" : "/resources/bc/res251"
+		        "name" : "/MOCKUP/bc/res251"
 		      } ,
 		      { 
 		        "group" : 0 ,
-		        "name" : "/resources/bc/res136"
+		        "name" : "/MOCKUP/bc/res136"
 		      } ,
 		      { 
 		        "group" : 0 ,
-		        "name" : "/resources/bc/res274"
+		        "name" : "/MOCKUP/bc/res274"
 		      } ,
 		      { 
 		        "group" : 0 ,
-		        "name" : "/resources/bc/res159"
+		        "name" : "/MOCKUP/bc/res159"
 		      } ,
 		      { 
 		        "group" : 0 ,
-		        "name" : "/resources/dc-invmbr/res5"
+		        "name" : "/MOCKUP/dc-invmbr/res5"
 		      } ,
 		      { 
 		        "group" : 0 ,
-		        "name" : "/resources/bc/res27"
+		        "name" : "/MOCKUP/bc/res27"
 		      } ,
 		      { 
 		        "group" : 0 ,
-		        "name" : "/resources/bc/res383"
+		        "name" : "/MOCKUP/bc/res383"
 		      } ,
 		      { 
 		        "group" : 0 ,
-		        "name" : "/resources/dc-diffmr/res5"
+		        "name" : "/MOCKUP/dc-diffmr/res5"
 		      } ,
 		      { 
 		        "group" : 0 ,
-		        "name" : "/resources/dc-simple/res5"
+		        "name" : "/MOCKUP/dc-simple/res5"
 		      } ,
 		      { 
 		        "group" : 1 ,
@@ -408,79 +409,79 @@ module.exports = function(app, store) {
 		      } ,
 		      { 
 		        "group" : 0 ,
-		        "name" : "/resources/bc/"
+		        "name" : "/MOCKUP/bc/"
 		      } ,
 		      { 
 		        "group" : 0 ,
-		        "name" : "/resources/bc/res226"
+		        "name" : "/MOCKUP/bc/res226"
 		      } ,
 		      { 
 		        "group" : 0 ,
-		        "name" : "/resources/diffmr1"
+		        "name" : "/MOCKUP/diffmr1"
 		      } ,
 		      { 
 		        "group" : 0 ,
-		        "name" : "/resources/bc/res67"
+		        "name" : "/MOCKUP/bc/res67"
 		      } ,
 		      { 
 		        "group" : 0 ,
-		        "name" : "/resources/diffmr2"
+		        "name" : "/MOCKUP/diffmr2"
 		      } ,
 		      { 
 		        "group" : 0 ,
-		        "name" : "/resources/bc/res310"
+		        "name" : "/MOCKUP/bc/res310"
 		      } ,
 		      { 
 		        "group" : 2 ,
-		        "name" : "/resources/bc/res45?_rdf"
+		        "name" : "/MOCKUP/bc/res45?_rdf"
 		      } ,
 		      { 
 		        "group" : 0 ,
-		        "name" : "/resources/bc/res52"
+		        "name" : "/MOCKUP/bc/res52"
 		      } ,
 		      { 
 		        "group" : 3 ,
-		        "name" : "/resources/dc-diffmr/"
+		        "name" : "/MOCKUP/dc-diffmr/"
 		      } ,
 		      { 
 		        "group" : 0 ,
-		        "name" : "/resources/bc/res90"
+		        "name" : "/MOCKUP/bc/res90"
 		      } ,
 		      { 
 		        "group" : 0 ,
-		        "name" : "/resources/bc/res5"
+		        "name" : "/MOCKUP/bc/res5"
 		      } ,
 		      { 
 		        "group" : 3 ,
-		        "name" : "/resources/dc-invmbr-diffmr/"
+		        "name" : "/MOCKUP/dc-invmbr-diffmr/"
 		      } ,
 		      { 
 		        "group" : 0 ,
-		        "name" : "/resources/bc/res367"
+		        "name" : "/MOCKUP/bc/res367"
 		      } ,
 		      { 
 		        "group" : 0 ,
-		        "name" : "/resources/bc/res205"
+		        "name" : "/MOCKUP/bc/res205"
 		      } ,
 		      { 
 		        "group" : 3 ,
-		        "name" : "/resources/dc-simple/"
+		        "name" : "/MOCKUP/dc-simple/"
 		      } ,
 		      { 
 		        "group" : 0 ,
-		        "name" : "/resources/bc-asres/"
+		        "name" : "/MOCKUP/bc-asres/"
 		      } ,
 		      { 
 		        "group" : 3 ,
-		        "name" : "/resources/dc-invmbr/"
+		        "name" : "/MOCKUP/dc-invmbr/"
 		      } ,
 		      { 
 		        "group" : 3 ,
-		        "name" : "/resources/"
+		        "name" : "/MOCKUP/"
 		      } ,
 		      { 
 		        "group" : 0 ,
-		        "name" : "/resources/dc-invmbr-diffmr/res5"
+		        "name" : "/MOCKUP/dc-invmbr-diffmr/res5"
 		      }
 		    ]
 		};
