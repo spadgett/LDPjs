@@ -131,7 +131,17 @@ module.exports = function(app, db) {
 
 	resource.delete(function(req, res, next) {
 		console.log('DELETE: ' + req.path);
-		res.send(501);
+		db.remove(req.fullURL, function(err, result) {
+			if (err) {
+				console.log(err.stack);
+				res.send(500);
+				return;
+			}
+
+			console.dir(result);
+
+			res.send(result ? 204 : 404);
+		});
 	});
 
 	resource.options(function(req, res, next) {
