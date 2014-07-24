@@ -69,14 +69,14 @@ module.exports = function(app, db) {
 			return;
 		}
 
-		parse(req, req.fullURL, function(err, triples, requestedInteraction) {
+		parse(req, req.fullURL, function(err, triples, interactionModel) {
 			if (err) {
 				res.send(400);
 				return;
 			}
 
 			// get the resource to check if it exists and check its ETag
-			db.get(req.fullURL, function(err, triples, interactionModel) {
+			db.get(req.fullURL, function(err, originalTriples, originalInteraction) {
 				db.put(req.fullURL, null, interactionModel, triples, function(err) {
 					if (err) {
 						console.log(err.stack);
