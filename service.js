@@ -68,7 +68,7 @@ module.exports = function(app, db) {
 			return;
 		}
 
-		parse(req, function(err, triples, interactionModel) {
+		parse(req, req.fullURL, function(err, triples, interactionModel) {
 			if (err) {
 				res.send(400);
 				return;
@@ -107,15 +107,15 @@ module.exports = function(app, db) {
 				return;
 			}
 
-			parse(req, function(err, triples, interactionModel) {
+			var loc = req.fullURL
+						   + ((req.fullURL.substr(-1) == '/') ? '' : '/')
+						   + 'res' + Date.now();
+			parse(req, loc, function(err, triples, interactionModel) {
 				if (err) {
 					res.send(400);
 					return;
 				}
 			   
-				var loc = req.fullURL
-							   + ((req.fullURL.substr(-1) == '/') ? '' : '/')
-							   + 'res' + Date.now();
 				db.put(loc, req.fullURL, interactionModel, triples, function(err) {
 					if (err) {
 						console.log(err.stack);
@@ -134,7 +134,7 @@ module.exports = function(app, db) {
 		res.send(501);
 	});
 
-	function parse(req, callback) {
+	function parse(req, resourceURI, callback) {
 		var parser = N3.Parser();
 		var triples = [];
 		var interactionModel = ldp.RDFSource;
@@ -143,9 +143,17 @@ module.exports = function(app, db) {
 				callback(err);
 				return;
 			}
-		   
+
 			if (triple) {
-				if (triple.subject === ''
+				// resolve the null relative URI
+				if (triple.subject === '') {
+					triple.subject = resourceURI;
+
+				}
+
+				// if this triple is <> rdf:type ldp:BasicContainer RDF type,
+				// set the interaction model as BasicContainer
+				if (triple.subject === resourceURI
 					&& triple.predicate === 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type'
 					&& triple.object === ldp.BasicContainer) {
 						interactionModel = ldp.BasicContainer;
