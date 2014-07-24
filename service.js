@@ -134,6 +134,33 @@ module.exports = function(app, db) {
 		res.send(501);
 	});
 
+	resource.options(function(req, res, next) {
+		db.get(req.fullURL, function(err, triples, interactionModel) {
+			if (err) {
+				console.log(err.stack);
+				res.send(500);
+				return;
+			}
+
+			res.links({
+				type: ldp.RDFSource
+			});
+
+			var allow = 'GET,PUT,DELETE,OPTIONS';
+			if (interactionModel === ldp.BasicContainer) {
+				res.links({
+					type: ldp.BasicContainer
+				});
+
+				allow += ',POST';
+				res.set('Accept-Post', media.turtle);
+			}
+
+			res.set('Allow', allow);
+			res.send(200);
+		});
+	});
+
 	function parse(req, resourceURI, callback) {
 		var parser = N3.Parser();
 		var triples = [];
