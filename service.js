@@ -3,6 +3,7 @@ module.exports = function(app, db) {
 	var ldp = require('./vocab/ldp.js');			// LDP vocabulary
 	var media = require('./media.js');				// media types
 	var N3 = require('n3');
+	var crypto = require('crypto');					// for MD5 (ETags)
 
 	// route any requests matching /r/*
 	var resource = app.route('/r/*');
@@ -53,10 +54,10 @@ module.exports = function(app, db) {
 						});
 					});
 
-					writeTurtle(res, triples);
+					writeTurtle(req, res, triples);
 				});	
 			} else {
-				writeTurtle(res, triples);
+				writeTurtle(req, res, triples);
 			}
 		});
 	});
@@ -68,20 +69,23 @@ module.exports = function(app, db) {
 			return;
 		}
 
-		parse(req, req.fullURL, function(err, triples, interactionModel) {
+		parse(req, req.fullURL, function(err, triples, requestedInteraction) {
 			if (err) {
 				res.send(400);
 				return;
 			}
 
-			db.put(req.fullURL, null, interactionModel, triples, function(err) {
-				if (err) {
-					console.log(err.stack);
-					res.send(500);
-					return;
-				}
-			
-				res.send(204);	
+			// get the resource to check if it exists and check its ETag
+			db.get(req.fullURL, function(err, triples, interactionModel) {
+				db.put(req.fullURL, null, interactionModel, triples, function(err) {
+					if (err) {
+						console.log(err.stack);
+						res.send(500);
+						return;
+					}
+
+					res.send(triples ? 204 : 201)
+				});
 			});
 		});
 	});
@@ -137,8 +141,6 @@ module.exports = function(app, db) {
 				res.send(500);
 				return;
 			}
-
-			console.dir(result);
 
 			res.send(result ? 204 : 404);
 		});
@@ -209,15 +211,29 @@ module.exports = function(app, db) {
 		});
 	}
 
-	function writeTurtle(res, triples) {
-		var writer = new N3.Writer();
+	function asTurtle(triples, callback) {
+		var writer = N3.Writer();
 		writer.addTriples(triples);
-		writer.end(function(err, result) {
+		writer.end(callback);
+	}
+
+	function getETag(turtle) {
+		return 'W/"' + crypto.createHash('md5').update(turtle).digest('hex') + '"';
+	}
+
+	function writeTurtle(req, res, triples) {
+		asTurtle(triples, function(err, turtle) {
 			if (err) {
 				res.send(500);
 			} else {
-				res.writeHead(200, { 'Content-Type': media.turtle });
-				res.end(new Buffer(result), 'utf-8');
+				var eTag = getETag(turtle);
+				if (req.get('If-None-Match') === eTag) {
+					res.send(304);
+					return;
+				}
+
+				res.writeHead(200, { 'ETag': eTag, 'Content-Type': media.turtle });
+				res.end(new Buffer(turtle), 'utf-8');
 			}
 		});
 	}
