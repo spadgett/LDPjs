@@ -33,10 +33,15 @@ app.use(function(req, res, next) {
 });
 
 // initialize database and set up LDP services and viz when ready
-require('./db.js').init(function(store) {
-	require('./service.js')(app, store);
-	require('./viz.js')(app, store);
-	require('./sparql.js')(app, store);
+var db = require('./db.js');
+db.init(function(err) {
+	if (err) {
+		console.log(err);
+	} else {
+		require('./service.js')(app, db);
+		//require('./viz.js')(app, db);
+		//require('./sparql.js')(app, db);
+	}
 });
 
 // error handling

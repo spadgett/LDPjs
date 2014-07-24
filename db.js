@@ -1,43 +1,42 @@
-var rdfstore = require('rdfstore');
+var db;
 
 exports.init = function(callback) {
-	// setup rdfstore/mongo
-	var storage='mongodb';
-
-	function registerNamespaces(store) {
-		store.registerDefaultProfileNamespaces();
-		store.registerDefaultNamespace('http://www.w3.org/ns/ldp#', 'ldp');
-	}
-
+	var mongoURL;
 	if (process.env.VCAP_SERVICES) {
 		var env = JSON.parse(process.env.VCAP_SERVICES);
-		var mongo = env['mongodb-2.2'][0].credentials;
+		mongoURL = env['mongodb-2.2'][0].credentials.url;
 	} else {
-		var mongo = {
-			  "hostname" : "localhost",
-			  "host" : "127.0.0.1",
-			  "port" : 27017
-		};
+		mongoURL = "mongodb://localhost:27017/ldp";
 	}
+	require('mongodb').connect(mongoURL, function(err, conn) {
+		db = conn;
+		callback(err);
+    });
+}
 
-	if (storage === 'mongodb') {
-		new rdfstore.Store({
-			persistent: true,
-			engine: 'mongodb',
-			name: mongo.db || 'ldpjs',
-			overwrite: false,
-			mongoDomain:
-				(mongo.username && mongo.password)
-					? mongo.username + ":" + mongo.password + "@" + mongo.hostname
-					: mongo.hostname,
-			mongoPort: mongo.port
-	   }, function(store){
-		   registerNamespaces(store);
-		   callback(store);
-	   });
-	} else {
-	   var store = rdfstore.create();
-	   registerNamespaces(store);
-	   callback(store);
-	}
+exports.put = function(uri, containedBy, interactionModel, triples, callback) {
+	var doc = {
+		name: uri,
+		containedBy: containedBy,
+		interactionModel: interactionModel,
+		triples: triples
+	};
+
+	console.log('db.put');
+	console.dir(doc);
+	var collection = db.collection('graphs');
+	collection.update({ name: uri }, doc, { upsert: true, safe: true }, callback);
+};
+
+exports.get = function(uri, callback) {
+	console.log('db.get');
+	var collection = db.collection('graphs');
+	collection.find({ name: uri }, { limit: 1 }).toArray(function(err, docs) {
+		if (docs && docs[0]) {
+			console.dir(docs[0]);
+			callback(err, docs[0].triples);
+		} else {
+			callback(err);
+		}
+	});
 };
