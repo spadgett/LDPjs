@@ -152,6 +152,11 @@ module.exports = function(app, db) {
 				return;
 			}
 
+			if (!triples) {
+				res.send(404);
+				return;
+			}
+
 			res.links({
 				type: ldp.RDFSource
 			});
