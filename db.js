@@ -50,6 +50,10 @@ exports.get = function(uri, callback) {
 	});
 };
 
+exports.remove = function(uri, callback) {
+	graphs().remove({ name: uri }, callback);
+};
+
 exports.isContainer = function(uri, callback) {
 	graphs().find( { name: uri, interactionModel: ldp.BasicContainer }).count(function(err, count) {
 		callback(err, count);
