@@ -12,6 +12,8 @@ module.exports = function(app, store) {
 				res.send(500);
 				return;
 			}
+			console.log('got results');
+			console.dir(results);
 			res.json(results);
 		});
 	});

@@ -1,20 +1,36 @@
 module.exports = function(app, store) {
 	var rdfserver = require('rdfstore/server.js');
 	var ldp = require('./vocab/ldp.js');
-	
+    var async = require('async');
 	var resource = app.route('/v');
 
 	resource.get(function(req, res, next) {
 		console.log('GET ' + req.path);
-		res.json(stubData);
-		/*
-		store.graph("http://localhost:3000/r/foo", function(success, graph) {
-			if (!success) {
-				res.send(500);
-				return;
-			}
-			res.json(graph);
-		}); */
+        store.registeredGraphs(function(success, graphs) {
+        	var resJson = {links: [{source:2,target:18,value:1}],
+          		   nodes: [{group:0,name:"/r/fake"}]};
+	    
+            async.each(graphs, function(graph, callback) {
+        		store.graph(graph.nominalValue, function(success, g) {
+            	console.log('graph name: '+graph.nominalValue);
+            	if (success) {
+    	            for (var t=0; t<g.triples.length; t++) {
+    	            	var s = g.triples[t].subject;
+    	            	var p = g.triples[t].predicate;
+    	            	var o = g.triples[t].object;
+    	            	console.log("triple: ("+s+","+p+","+o+")");
+    	            	resJson.links.push({source:1,target:20,value:2});
+    	             	resJson.nodes.push({group:1,name:"/r/anotherfake"});
+    	            }
+            	}
+            	callback();
+            });
+            },
+            function(err) {
+     	        //console.log('sent json response');
+    	    	res.json(resJson);
+            });
+		});
 	});
 	
 	var stubData = { 
