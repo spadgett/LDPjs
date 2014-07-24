@@ -40,7 +40,6 @@ db.init(function(err) {
 	} else {
 		require('./service.js')(app, db);
 		//require('./viz.js')(app, db);
-		//require('./sparql.js')(app, db);
 	}
 });
 
