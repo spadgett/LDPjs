@@ -1,4 +1,9 @@
 var db;
+var ldp = require('./vocab/ldp.js');			// LDP vocabulary
+
+function graphs() {
+	return db.collection('graphs');
+}
 
 exports.init = function(callback) {
 	var mongoURL;
@@ -17,26 +22,49 @@ exports.init = function(callback) {
 exports.put = function(uri, containedBy, interactionModel, triples, callback) {
 	var doc = {
 		name: uri,
-		containedBy: containedBy,
-		interactionModel: interactionModel,
 		triples: triples
 	};
 
+	if (containedBy) {
+		doc.containedBy = containedBy;
+	}
+
+	if (interactionModel) {
+		doc.interactionModel = interactionModel;
+	}
+
 	console.log('db.put');
 	console.dir(doc);
-	var collection = db.collection('graphs');
-	collection.update({ name: uri }, doc, { upsert: true, safe: true }, callback);
+	graphs().update({ name: uri }, doc, { upsert: true, safe: true }, callback);
 };
 
 exports.get = function(uri, callback) {
 	console.log('db.get');
-	var collection = db.collection('graphs');
-	collection.find({ name: uri }, { limit: 1 }).toArray(function(err, docs) {
+	graphs().find({ name: uri }, {}).toArray(function(err, docs) {
 		if (docs && docs[0]) {
 			console.dir(docs[0]);
-			callback(err, docs[0].triples);
+			callback(err, docs[0].triples, docs[0].interactionModel);
 		} else {
 			callback(err);
 		}
+	});
+};
+
+exports.isContainer = function(uri, callback) {
+	graphs().find( { name: uri, interactionModel: ldp.BasicContainer }).count(function(err, count) {
+		callback(err, count);
+	});
+};
+
+exports.getContainment = function(uri, callback) {
+	graphs().find( { containedBy: uri }, { name: 1 }).toArray(function(err, docs) {
+		var result = [];
+		if (docs) {
+			docs.forEach(function(doc) {
+				result.push(doc.name);
+			});
+		}
+
+		callback(err, result);
 	});
 };
