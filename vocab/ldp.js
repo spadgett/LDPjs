@@ -12,3 +12,7 @@ define('prefix', 'ldp');
 // Resources
 define('Resource', ns + 'Resource');
 define('RDFSource', ns + 'RDFSource');
+define('BasicContainer', ns + 'BasicContainer');
+
+// Properties
+define('contains', ns + 'contains');
