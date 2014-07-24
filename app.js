@@ -39,7 +39,7 @@ db.init(function(err) {
 		console.log(err);
 	} else {
 		require('./service.js')(app, db);
-		//require('./viz.js')(app, db);
+		require('./viz.js')(app, db);
 	}
 });
 
