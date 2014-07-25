@@ -1,6 +1,8 @@
 var db;
 var ldp = require('./vocab/ldp.js');			// LDP vocabulary
 
+exports.graphs;
+
 function graphs() {
 	return db.collection('graphs');
 }
@@ -15,6 +17,7 @@ exports.init = function(callback) {
 	}
 	require('mongodb').connect(mongoURL, function(err, conn) {
 		db = conn;
+		exports.graphs = graphs();
 		callback(err);
     });
 }

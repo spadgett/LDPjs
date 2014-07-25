@@ -14,7 +14,8 @@ app.set('views', __dirname + '/views'); //optional since express defaults to CWD
 
 // fill in full request URL
 app.use(function(req, res, next) {
-	req.fullURL = req.protocol + '://' + req.get('host') + req.originalUrl;
+	req.publicUri = req.protocol + '://' + req.get('host');
+	req.fullURL = req.publicUri + req.originalUrl;
 	next();
 });
 
