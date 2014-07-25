@@ -130,6 +130,11 @@ module.exports = function(app, db, env) {
 								return;
 							}
 
+							if (modifiesContainment(original, triples)) {
+								res.send(409);
+								return;
+							}
+
 							// we don't support changing from RDFSource to container or back
 							// use the original interaction model
 							db.put(req.fullURL, null, original.interactionModel, triples, function(err) {
@@ -352,5 +357,30 @@ module.exports = function(app, db, env) {
 		} else {
 			uniqueURI(container, callback);
 		}
+	}
+
+	function modifiesContainment(originalDocument, newTriples) {
+		if (originalDocument.interactionModel !== ldp.BasicContainer) {
+			return false;
+		}
+
+		var originalTotal = 0, newTotal = 0, originalContainment = {};
+		originalDocument.triples.forEach(function(triple) {
+			if (triple.subject === originalDocument.name && triple.predicate === ldp.contains) {
+				originalContainment[triple.object] = 1;
+				originalTotal++;
+			}
+		});
+
+		newTriples.forEach(function(triple) {
+			if (triple.subject === originalDocument.name && triple.predicate === ldp.contains) {
+				if (!originalContainment[triple.object]) {
+					return true;
+				}
+				newTotal++;
+			}
+		});
+
+		return originalTotal !== newTotal;
 	}
 };
