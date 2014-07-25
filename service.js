@@ -98,7 +98,7 @@ module.exports = function(app, db, env) {
 
 					// add containment triples if necessary to calculate the correct ETag
 					// for containers
-					addContainment(req, triples, interactionModel, function(err) {
+					addContainment(req, originalTriples, interactionModel, function(err) {
 						if (err) {
 							console.log(err.stack);
 							res.send(500);
@@ -106,7 +106,7 @@ module.exports = function(app, db, env) {
 						}
 
 						// calculate the ETag from the text/turtle representation
-						asTurtle(triples, function(err, turtle) {
+						asTurtle(originalTriples, function(err, turtle) {
 							if (err) {
 								console.log(err.stack);
 								res.send(500);
