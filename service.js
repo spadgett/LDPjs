@@ -15,8 +15,7 @@ module.exports = function(app, db, env) {
 		next();
 	});
 
-	resource.get(function(req, res, next) {
-		console.log('GET ' + req.path);
+	function get(req, res, includeBody) {
 		db.get(req.fullURL, function(err, triples, interactionModel) {
 			if (err) {
 				console.log(err.stack);
@@ -29,7 +28,12 @@ module.exports = function(app, db, env) {
 				return;
 			}
 
-			addLinkHeaders(res, interactionModel);
+			if (!req.accepts(media.turtle)) {
+				res.send(406);
+				return;
+			}
+
+			addHeaders(res, interactionModel);
 			addContainment(req, triples, interactionModel, function(err) {
 				if (err) {
 					console.log(err.stack);
@@ -37,9 +41,36 @@ module.exports = function(app, db, env) {
 					return;
 				}
 
-				writeTurtle(req, res, triples);
+				asTurtle(triples, function(err, turtle) {
+					if (err) {
+						res.send(500);
+					} else {
+						var eTag = getETag(turtle);
+						if (req.get('If-None-Match') === eTag) {
+							res.send(304);
+							return;
+						}
+
+						res.writeHead(200, { 'ETag': eTag, 'Content-Type': media.turtle });
+						if (includeBody) {
+							res.end(new Buffer(turtle), 'utf-8');
+						} else {
+							res.end();
+						}
+					}
+				});
 			});
 		});
+	}
+
+	resource.get(function(req, res, next) {
+		console.log('GET ' + req.path);
+		get(req, res, true);
+	});
+
+	resource.head(function(req, res, next) {
+		console.log('HEAD ' + req.path);
+		get(req, res, false);
 	});
 
 	resource.put(function(req, res, next) {
@@ -145,7 +176,7 @@ module.exports = function(app, db, env) {
 					return;
 				}
 
-				addLinkHeaders(res, interactionModel);
+				addHeaders(res, interactionModel);
 	   
 				db.put(loc, req.fullURL, interactionModel, triples, function(err) {
 					if (err) {
@@ -186,19 +217,7 @@ module.exports = function(app, db, env) {
 				return;
 			}
 
-			addLinkHeaders(res, interactionModel);
-
-			var allow = 'GET,PUT,DELETE,OPTIONS';
-			if (interactionModel === ldp.BasicContainer) {
-				res.links({
-					type: ldp.BasicContainer
-				});
-
-				allow += ',POST';
-				res.set('Accept-Post', media.turtle);
-			}
-
-			res.set('Allow', allow);
+			addHeaders(res, interactionModel);
 			res.send(200);
 		});
 	});
@@ -246,12 +265,19 @@ module.exports = function(app, db, env) {
 		return 'W/"' + crypto.createHash('md5').update(turtle).digest('hex') + '"';
 	}
 
-	function addLinkHeaders(res, interactionModel) {
+	function addHeaders(res, interactionModel) {
 		res.links({ type: ldp.RDFSource });
-
+		var allow = 'GET,HEAD,PUT,DELETE,OPTIONS';
 		if (interactionModel === ldp.BasicContainer) {
-			res.links({ type: ldp.BasicContainer });
+			res.links({
+				type: ldp.BasicContainer
+			});
+
+			allow += ',POST';
+			res.set('Accept-Post', media.turtle);
 		}
+
+		res.set('Allow', allow);
 	}
 
 	// insert containment triples if necessary
@@ -272,22 +298,5 @@ module.exports = function(app, db, env) {
 		} else {
 			callback();
 		}
-	}
-
-	function writeTurtle(req, res, triples) {
-		asTurtle(triples, function(err, turtle) {
-			if (err) {
-				res.send(500);
-			} else {
-				var eTag = getETag(turtle);
-				if (req.get('If-None-Match') === eTag) {
-					res.send(304);
-					return;
-				}
-
-				res.writeHead(200, { 'ETag': eTag, 'Content-Type': media.turtle });
-				res.end(new Buffer(turtle), 'utf-8');
-			}
-		});
 	}
 };
