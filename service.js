@@ -29,36 +29,16 @@ module.exports = function(app, db, env) {
 				return;
 			}
 
-			res.links({
-				type: ldp.RDFSource
-			});
+			addLinkHeaders(res, interactionModel);
+			addContainment(req, triples, interactionModel, function(err) {
+				if (err) {
+					console.log(err.stack);
+					res.send(500);
+					return;
+				}
 
-			if (interactionModel === ldp.BasicContainer) {
-				res.links({
-					type: ldp.BasicContainer
-				});
-
-				// add in ldp:contains triples
-				db.getContainment(req.fullURL, function(err, containment) {
-					if (err) {
-						console.log(err.stack);
-						res.send(500);
-						return;
-					}
-
-					containment.forEach(function(resource) {
-						triples.push({
-							subject: req.fullURL,
-							predicate: ldp.contains,
-							object: resource
-						});
-					});
-
-					writeTurtle(req, res, triples);
-				});	
-			} else {
 				writeTurtle(req, res, triples);
-			}
+			});
 		});
 	});
 
@@ -77,15 +57,62 @@ module.exports = function(app, db, env) {
 
 			// get the resource to check if it exists and check its ETag
 			db.get(req.fullURL, function(err, originalTriples, originalInteraction) {
-				db.put(req.fullURL, null, interactionModel, triples, function(err) {
-					if (err) {
-						console.log(err.stack);
-						res.send(500);
+				if (originalTriples) {
+					// update
+					var ifMatch = req.get('If-Match');
+					if (!ifMatch) {
+						res.send(428);
 						return;
 					}
 
-					res.send(triples ? 204 : 201)
-				});
+					// add containment triples if necessary to calculate the correct ETag
+					// for containers
+					addContainment(req, triples, interactionModel, function(err) {
+						if (err) {
+							console.log(err.stack);
+							res.send(500);
+							return;
+						}
+
+						// calculate the ETag from the text/turtle representation
+						asTurtle(triples, function(err, turtle) {
+							if (err) {
+								console.log(err.stack);
+								res.send(500);
+								return;
+							}
+
+							var eTag = getETag(turtle);
+							if (ifMatch !== eTag) {
+								res.send(412);
+								return;
+							}
+
+							// we don't support changing from RDFSource to container or back
+							// use the original interaction model
+							db.put(req.fullURL, null, originalInteraction, triples, function(err) {
+								if (err) {
+									console.log(err.stack);
+									res.send(500);
+									return;
+								}
+
+								res.send(originalTriples ? 204 : 201)
+							});
+						});
+					});
+				} else {
+					// create
+					db.put(req.fullURL, null, interactionModel, triples, function(err) {
+						if (err) {
+							console.log(err.stack);
+							res.send(500);
+							return;
+						}
+
+						res.send(originalTriples ? 204 : 201)
+					});
+				}
 			});
 		});
 	});
@@ -104,8 +131,6 @@ module.exports = function(app, db, env) {
 				return;
 			}
 
-			console.log('isContainer: ' + result);
-			
 			if (!result) {
 				res.send(409);
 				return;
@@ -119,7 +144,9 @@ module.exports = function(app, db, env) {
 					res.send(400);
 					return;
 				}
-			   
+
+				addLinkHeaders(res, interactionModel);
+	   
 				db.put(loc, req.fullURL, interactionModel, triples, function(err) {
 					if (err) {
 						console.log(err.stack);
@@ -159,9 +186,7 @@ module.exports = function(app, db, env) {
 				return;
 			}
 
-			res.links({
-				type: ldp.RDFSource
-			});
+			addLinkHeaders(res, interactionModel);
 
 			var allow = 'GET,PUT,DELETE,OPTIONS';
 			if (interactionModel === ldp.BasicContainer) {
@@ -219,6 +244,34 @@ module.exports = function(app, db, env) {
 
 	function getETag(turtle) {
 		return 'W/"' + crypto.createHash('md5').update(turtle).digest('hex') + '"';
+	}
+
+	function addLinkHeaders(res, interactionModel) {
+		res.links({ type: ldp.RDFSource });
+
+		if (interactionModel === ldp.BasicContainer) {
+			res.links({ type: ldp.BasicContainer });
+		}
+	}
+
+	// insert containment triples if necessary
+	function addContainment(req, triples, interactionModel, callback) {
+		if (interactionModel === ldp.BasicContainer) {
+			db.getContainment(req.fullURL, function(err, containment) {
+				if (containment) {
+					containment.forEach(function(resource) {
+						triples.push({
+							subject: req.fullURL,
+							predicate: ldp.contains,
+							object: resource
+						});
+					});
+				}
+				callback(err);
+			});	
+		} else {
+			callback();
+		}
 	}
 
 	function writeTurtle(req, res, triples) {
