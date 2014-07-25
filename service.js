@@ -1,4 +1,4 @@
-module.exports = function(app, db) {
+module.exports = function(app, db, env) {
 	var url = require('url');
 	var ldp = require('./vocab/ldp.js');			// LDP vocabulary
 	var media = require('./media.js');				// media types
@@ -6,7 +6,7 @@ module.exports = function(app, db) {
 	var crypto = require('crypto');					// for MD5 (ETags)
 
 	// route any requests matching /r/*
-	var resource = app.route('/r/*');
+	var resource = app.route(env.context + '*');
 	resource.all(function(req, res, next) {
 		// all responses should have Link: <ldp:Resource> rel=type
 		res.links({

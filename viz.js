@@ -1,10 +1,14 @@
-module.exports = function(app, db) {
-	var resource = app.route('/v');
-
-	resource.get(function(req, res, next) {
+module.exports = function(app, db, env) {
+	app.get('/v', function(req, res, next) {
 		console.log('GET ' + req.path);
 
 		db.graphs.find().toArray(function(err, docs){
+			if (err) {
+				console.log(err.stack);
+				res.send(500);
+				return;
+			}
+
 			var hash = {};
 			var jsonRes = { nodes: [], links: [] };
 			
@@ -12,7 +16,7 @@ module.exports = function(app, db) {
 			// keep track of array indexes
 			docs.forEach(function(d){
 				var node = {};
-				node.name = nodeName(req.publicUri, d.name);
+				node.name = nodeName(d.name);
 				node.group = 0;
 				var l = jsonRes.nodes.push(node);
 				hash[node.name] = l-1;
@@ -20,27 +24,29 @@ module.exports = function(app, db) {
 			
 			// Next find all the arcs between resources
 			docs.forEach(function(d) {
-				var subName = nodeName(req.publicUri, d.name);
-				d.triples.forEach(function(t) {
-					var objName = nodeName(req.publicUri, t.object);
-					if (hash[subName] > -1 &&
-						hash[subName] < jsonRes.nodes.length && 
-						hash[objName] > -1 &&
-						hash[objName] < jsonRes.nodes.length) {
-						var link = {};
-						link.value = 1; // Always 1, why?
-						link.source = hash[subName];
-						link.target = hash[objName];
-						jsonRes.links.push(link);
-					}
-				});
+				if (d.triples) {
+					var subName = nodeName(d.name);
+					d.triples.forEach(function(t) {
+						var objName = nodeName(t.object);
+						if (hash[subName] > -1 &&
+							hash[subName] < jsonRes.nodes.length && 
+							hash[objName] > -1 &&
+							hash[objName] < jsonRes.nodes.length) {
+							var link = {};
+							link.value = 1; // Always 1, why?
+							link.source = hash[subName];
+							link.target = hash[objName];
+							jsonRes.links.push(link);
+						}
+					});
+				}
 			});
 			res.json(jsonRes);
 		});
 
 	});
-};
 
-function nodeName(publicUri, uri) {
-	return uri.replace(publicUri, '');
-}
+	function nodeName(uri) {
+		return uri.replace(env.appBase, '');
+	}
+};

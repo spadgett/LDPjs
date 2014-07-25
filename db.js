@@ -7,15 +7,8 @@ function graphs() {
 	return db.collection('graphs');
 }
 
-exports.init = function(callback) {
-	var mongoURL;
-	if (process.env.VCAP_SERVICES) {
-		var env = JSON.parse(process.env.VCAP_SERVICES);
-		mongoURL = env['mongodb-2.2'][0].credentials.url;
-	} else {
-		mongoURL = "mongodb://localhost:27017/ldp";
-	}
-	require('mongodb').connect(mongoURL, function(err, conn) {
+exports.init = function(env, callback) {
+	require('mongodb').connect(env.mongoURL, function(err, conn) {
 		db = conn;
 		exports.graphs = graphs();
 		callback(err);
