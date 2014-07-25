@@ -16,14 +16,20 @@ module.exports = function(app, db, env) {
 	});
 
 	function get(req, res, includeBody) {
-		db.get(req.fullURL, function(err, triples, interactionModel) {
+		db.get(req.fullURL, function(err, document) {
 			if (err) {
 				console.log(err.stack);
 				res.send(500);
 				return;
 			}
 
-			if (!triples) {
+			if (document.deleted) {
+				res.send(410);
+				return;
+			}
+
+
+			if (!document.triples) {
 				res.send(404);
 				return;
 			}
@@ -33,15 +39,15 @@ module.exports = function(app, db, env) {
 				return;
 			}
 
-			addHeaders(res, interactionModel);
-			addContainment(req, triples, interactionModel, function(err) {
+			addHeaders(res, document.interactionModel);
+			addContainment(req, document, function(err) {
 				if (err) {
 					console.log(err.stack);
 					res.send(500);
 					return;
 				}
 
-				asTurtle(triples, function(err, turtle) {
+				asTurtle(document.triples, function(err, turtle) {
 					if (err) {
 						res.send(500);
 					} else {
@@ -87,8 +93,13 @@ module.exports = function(app, db, env) {
 			}
 
 			// get the resource to check if it exists and check its ETag
-			db.get(req.fullURL, function(err, originalTriples, originalInteraction) {
-				if (originalTriples) {
+			db.get(req.fullURL, function(err, original) {
+				if (original) {
+					if (original.deleted) {
+						res.send(410);
+						return;
+					}
+
 					// update
 					var ifMatch = req.get('If-Match');
 					if (!ifMatch) {
@@ -98,7 +109,7 @@ module.exports = function(app, db, env) {
 
 					// add containment triples if necessary to calculate the correct ETag
 					// for containers
-					addContainment(req, originalTriples, interactionModel, function(err) {
+					addContainment(req, original, function(err) {
 						if (err) {
 							console.log(err.stack);
 							res.send(500);
@@ -106,7 +117,7 @@ module.exports = function(app, db, env) {
 						}
 
 						// calculate the ETag from the text/turtle representation
-						asTurtle(originalTriples, function(err, turtle) {
+						asTurtle(original.triples, function(err, turtle) {
 							if (err) {
 								console.log(err.stack);
 								res.send(500);
@@ -121,14 +132,14 @@ module.exports = function(app, db, env) {
 
 							// we don't support changing from RDFSource to container or back
 							// use the original interaction model
-							db.put(req.fullURL, null, originalInteraction, triples, function(err) {
+							db.put(req.fullURL, null, original.interactionModel, triples, function(err) {
 								if (err) {
 									console.log(err.stack);
 									res.send(500);
 									return;
 								}
 
-								res.send(originalTriples ? 204 : 201)
+								res.send(original ? 204 : 201)
 							});
 						});
 					});
@@ -141,7 +152,7 @@ module.exports = function(app, db, env) {
 							return;
 						}
 
-						res.send(originalTriples ? 204 : 201)
+						res.send(original ? 204 : 201)
 					});
 				}
 			});
@@ -167,25 +178,32 @@ module.exports = function(app, db, env) {
 				return;
 			}
 
-			var loc = req.fullURL
-						   + ((req.fullURL.substr(-1) == '/') ? '' : '/')
-						   + 'res' + Date.now();
-			parse(req, loc, function(err, triples, interactionModel) {
+			assignURI(req.fullURL, req.get('Slug'), function(err, loc) {
 				if (err) {
-					res.send(400);
+					console.log(err.stack);
+					res.send(500);
 					return;
 				}
 
-				addHeaders(res, interactionModel);
-	   
-				db.put(loc, req.fullURL, interactionModel, triples, function(err) {
+				parse(req, loc, function(err, triples, interactionModel) {
 					if (err) {
-						console.log(err.stack);
-						res.send(500);
+						// allow the URI to be used again
+						db.releaseURI(loc);
+						res.send(400);
 						return;
 					}
-				
-					res.location(loc).send(201);	
+
+					addHeaders(res, interactionModel);
+		   
+					db.put(loc, req.fullURL, interactionModel, triples, function(err) {
+						if (err) {
+							console.log(err.stack);
+							res.send(500);
+							return;
+						}
+					
+						res.location(loc).send(201);	
+					});
 				});
 			});
 		});
@@ -205,19 +223,24 @@ module.exports = function(app, db, env) {
 	});
 
 	resource.options(function(req, res, next) {
-		db.get(req.fullURL, function(err, triples, interactionModel) {
+		db.get(req.fullURL, function(err, document) {
 			if (err) {
 				console.log(err.stack);
 				res.send(500);
 				return;
 			}
 
-			if (!triples) {
+			if (document.deleted) {
+				res.send(410);
+				return;
+			}
+
+			if (!document.triples) {
 				res.send(404);
 				return;
 			}
 
-			addHeaders(res, interactionModel);
+			addHeaders(res, document.interactionModel);
 			res.send(200);
 		});
 	});
@@ -281,12 +304,12 @@ module.exports = function(app, db, env) {
 	}
 
 	// insert containment triples if necessary
-	function addContainment(req, triples, interactionModel, callback) {
-		if (interactionModel === ldp.BasicContainer) {
+	function addContainment(req, document, callback) {
+		if (document.interactionModel === ldp.BasicContainer) {
 			db.getContainment(req.fullURL, function(err, containment) {
 				if (containment) {
 					containment.forEach(function(resource) {
-						triples.push({
+						document.triples.push({
 							subject: req.fullURL,
 							predicate: ldp.contains,
 							object: resource
@@ -297,6 +320,37 @@ module.exports = function(app, db, env) {
 			});	
 		} else {
 			callback();
+		}
+	}
+
+	function addPath(uri, path) {
+		uri = uri.split("?")[0].split("#")[0];
+	    if (uri.substr(-1) !== '/') {
+			uri += '/';
+		}
+
+		return uri + encodeURIComponent(path);
+	}
+
+	function uniqueURI(container, callback) {
+		var candidate = addPath(container, 'res' + Date.now());
+		db.reserveURI(candidate, function(err) {
+			callback(err, candidate);
+		});
+	}
+
+	function assignURI(container, slug, callback) {
+		if (slug) {
+			var candidate = addPath(container, slug);
+			db.reserveURI(candidate, function(err) {
+				if (err) {
+					uniqueURI(container, callback);
+				} else {
+					callback(null, candidate);
+				}
+			});
+		} else {
+			uniqueURI(container, callback);
 		}
 	}
 };

@@ -20,6 +20,22 @@ exports.init = function(env, callback) {
     });
 }
 
+exports.reserveURI = function(uri, callback) {
+	// simply create a document with only a URI. we will just update it later on put
+	// if it fails, we reject the uri
+	graphs().insert( { name: uri }, function(err, result) {
+		callback(err);
+	});
+};
+
+exports.releaseURI = function(uri) {
+	graphs().remove( { name: uri }, function(err) {
+		if (err) {
+			console.log(err.stack);
+		}
+	});
+};
+
 exports.put = function(uri, containedBy, interactionModel, triples, callback) {
 	var doc = {
 		name: uri,
@@ -44,7 +60,7 @@ exports.get = function(uri, callback) {
 	graphs().find({ name: uri }, { limit: 1 }).toArray(function(err, docs) {
 		if (docs && docs[0]) {
 			console.dir(docs[0]);
-			callback(err, docs[0].triples, docs[0].interactionModel);
+			callback(err, docs[0]);
 		} else {
 			callback(err);
 		}
@@ -52,7 +68,7 @@ exports.get = function(uri, callback) {
 };
 
 exports.remove = function(uri, callback) {
-	graphs().remove({ name: uri }, callback);
+	graphs().update({ name: uri, }, {$set: { deleted: true, containedBy: null, triples: [] } }, { safe: true }, callback);
 };
 
 exports.isContainer = function(uri, callback) {
