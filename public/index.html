@@ -39,11 +39,6 @@
 
     <div id="visualization"></div>
 
-    <div style="float: right;">
-        <input type="checkbox" id="showConfig">
-        <label for="showConfig">Show configuration resources</label>
-    </div>
-
     <div class="tabs">
         <a href="#" id="getTab" style="font-weight: bold;">GET</a> |
         <a href="#" id="putTab">PUT</a> |
@@ -58,7 +53,6 @@
                 <select id="getMediaType">
                     <option>text/turtle</option>
                     <option>application/json</option>
-                    <option>application/rdf+xml</option>
                 </select>
                 <input type="submit" value="GET">
             </form>
@@ -67,25 +61,29 @@
     </div>
 
     <div id="put" class="tabContent" style="display: none;">
-        <form id="putForm" action="">
-            <div id="putResult" style="display: none;" class="message"></div>
-            <label for="putURI">Resource:</label>
-            <input type="url" id="putURI" class="urlInput" value="" required>
-            <textarea id="putContent" class="textArea" required cols="" rows=""></textarea>
-            <label for="putMediaType">Media Type:</label>
-            <select id="putMediaType">
-                <option>text/turtle</option>
-                <option>application/json</option>
-                <option>application/rdf+xml</option>
-            </select>
-            <input type="submit" value="PUT">
-        </form>
+	        <form id="putForm" action="">
+	            <input type="url" id="putURI" class="urlInput" value="" required>
+	            <select id="putMediaType">
+	                <option>text/turtle</option>
+	                <option>application/json</option>
+	            </select>
+	            <input type="submit" value="PUT">
+	            <div id="putResult" style="display: none;" class="message"></div>
+		       <textarea id="putContent" class="textArea fixed" required cols="" rows=""></textarea>
+	        </form>
     </div>
 
     <div id="post" class="tabContent" style="display: none;">
         <form id="postForm" action="">
+            <input type="url" id="postURI" class="urlInput" value="" required>
+            <select id="postMediaType">
+                <option>text/turtle</option>
+                <option>application/json</option>
+                <option>application/rdf+xml</option>
+            </select>
+            <input type="submit" value="POST">
             <div id="postResult" style="display: none;" class="message"></div>
-            <textarea id="postContent" class="textArea" required cols="" rows="">
+            <textarea id="postContent" class="textArea fixed" required cols="" rows="">
 @prefix dcterms: &lt;http://purl.org/dc/terms/&gt;.
 @prefix rdf:     &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#&gt;.
 @prefix bt:      &lt;http://example.org/vocab/bugtracker#&gt;.
@@ -94,22 +92,14 @@
       dcterms:title "Product C crashes when shutting down.";
       bt:isInState "New" . 
             </textarea>
-            <label for="postMediaType">Media Type:</label>
-            <select id="postMediaType">
-                <option>text/turtle</option>
-                <option>application/json</option>
-                <option>application/rdf+xml</option>
-            </select>
-            <input type="submit" value="POST">
         </form>
     </div>
 
     <div id="delete" class="tabContent" style="display: none;">
-        <div id="deleteResult" style="display: none;" class="message"></div>
         <form id="deleteForm" action="">
-            <label for="deleteURI">Resource:</label>
             <input type="url" id="deleteURI" class="urlInput" value="" required>
             <input type="submit" value="DELETE">
+	        <div id="deleteResult" style="display: none;" class="message"></div>
         </form>
     </div>
 
@@ -134,6 +124,8 @@
                 // If it's not, we can't make requests anyway because of the browser same origin policy.
 
                 dom.byId('getURI').value = uri;
+                // Just update POST URI on load/refresh
+                dom.byId('postURI').value = uri;
             }
 
             function showTab(tab, content) {
@@ -167,6 +159,17 @@
                         var n = dom.byId('resources');
                         n.innerHTML = '';
                         n.appendChild(document.createTextNode(data));
+                       
+                        // PUT: prefill URI and content
+                        dom.byId('putURI').value = dom.byId('getURI').value;
+                        //console.log('putURI='+url);
+                        var p = dom.byId('putContent');
+                        p.innerHTML = '';
+                        p.appendChild(document.createTextNode(data));
+                        
+                        // DELETE: prefill URI 
+                        dom.byId('deleteURI').value = dom.byId('getURI').value;                        
+                        
                         if (callback) {
                             callback();
                         }
@@ -203,7 +206,7 @@
             function postResource(e) {
                 event.stop(e);
                 xhr.post({
-                    url: '/r/',
+                    url: dom.byId('postURI').value,
                     headers: {
                         'Content-Type': dom.byId('postMediaType').value
                     },
@@ -232,8 +235,9 @@
                     load: function (data) {
                         var n = dom.byId('deleteResult');
                         n.innerHTML = '';
-                        n.appendChild(document.createTextNode('Deleted resource ' + dom.byId('putURI').value));
+                        n.appendChild(document.createTextNode('Deleted resource ' + dom.byId('deleteURI').value));
                         n.style.display = '';
+                        // TODO: reset getURI so refresh is smoother
                         refresh();
                     },
                     error: function (error, ioArgs) {
@@ -261,7 +265,7 @@
                     .attr("width", width)
                     .attr("height", height);
 
-                d3.xhr("/v?showConfig=" + dom.byId('showConfig').checked)
+                d3.xhr("/v")
                     .header('Accept', 'application/json')
                     .response(function (request) {
                         return JSON.parse(request.responseText);
@@ -343,7 +347,6 @@
                 on(dom.byId('putForm'), 'submit', putResource);
                 on(dom.byId('postForm'), 'submit', postResource);
                 on(dom.byId('deleteForm'), 'submit', deleteResource);
-                on(dom.byId('showConfig'), 'change', visualize);
 
                 // Call getResource() once before visualize() so that the root container can initialize.
                 getInternal(visualize);
