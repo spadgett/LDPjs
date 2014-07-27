@@ -1,4 +1,6 @@
 module.exports = function(app, db, env) {
+	var rdf = require('./vocab/rdf.js');
+	
 	app.get('/v', function(req, res, next) {
 		console.log('GET ' + req.path);
 
@@ -9,7 +11,9 @@ module.exports = function(app, db, env) {
 				return;
 			}
 
-			var hash = {};
+			var nodes = {};
+			var types = {"none":0};
+			var nextGroupIdx = 1;
 			var jsonRes = { nodes: [], links: [] };
 			
 			// First build the array of all nodes (resources/graphs),
@@ -19,7 +23,7 @@ module.exports = function(app, db, env) {
 				node.name = nodeName(d.name);
 				node.group = 0;
 				var l = jsonRes.nodes.push(node);
-				hash[node.name] = l-1;
+				nodes[node.name] = l-1;
 			});
 			
 			// Next find all the arcs between resources
@@ -28,15 +32,22 @@ module.exports = function(app, db, env) {
 					var subName = nodeName(d.name);
 					d.triples.forEach(function(t) {
 						var objName = nodeName(t.object);
-						if (hash[subName] > -1 &&
-							hash[subName] < jsonRes.nodes.length && 
-							hash[objName] > -1 &&
-							hash[objName] < jsonRes.nodes.length) {
+						if (nodes[subName] > -1 &&
+							nodes[subName] < jsonRes.nodes.length && 
+							nodes[objName] > -1 &&
+							nodes[objName] < jsonRes.nodes.length) {
 							var link = {};
 							link.value = 1; // Always 1, why?
-							link.source = hash[subName];
-							link.target = hash[objName];
+							link.source = nodes[subName];
+							link.target = nodes[objName];
 							jsonRes.links.push(link);
+						}
+						if (t.predicate == rdf.type) {
+							var g = types[t.object];
+							if (g == undefined) {
+								types[t.object] = nextGroupIdx++;
+							}
+							jsonRes.nodes[nodes[subName]].group = g;
 						}
 					});
 				}

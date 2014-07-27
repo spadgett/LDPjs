@@ -1,6 +1,7 @@
 module.exports = function(app, db, env) {
 	var url = require('url');
 	var ldp = require('./vocab/ldp.js');			// LDP vocabulary
+	var rdf = require('./vocab/rdf.js');			// RDF vocabulary
 	var media = require('./media.js');				// media types
 	var N3 = require('n3');
 	var crypto = require('crypto');					// for MD5 (ETags)
@@ -270,7 +271,7 @@ module.exports = function(app, db, env) {
 				// if this triple is <> rdf:type ldp:BasicContainer RDF type,
 				// set the interaction model as BasicContainer
 				if (triple.subject === resourceURI
-					&& triple.predicate === 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type'
+					&& triple.predicate === rdf.type
 					&& triple.object === ldp.BasicContainer) {
 						interactionModel = ldp.BasicContainer;
 				}
