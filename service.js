@@ -6,6 +6,18 @@ module.exports = function(app, db, env) {
 	var N3 = require('n3');
 	var crypto = require('crypto');					// for MD5 (ETags)
 
+	// create root container if it doesn't exist
+	db.get(env.ldpBase, function(err, document) {
+		if (err) {
+			console.log(err.stack);
+			return;
+		}
+
+		if (!document) {
+			createRootContainer();
+		}
+	});
+
 	// route any requests matching /r/*
 	var resource = app.route(env.context + '*');
 	resource.all(function(req, res, next) {
@@ -24,14 +36,13 @@ module.exports = function(app, db, env) {
 				return;
 			}
 
-			if (document.deleted) {
-				res.send(410);
+			if (!document) {
+				res.send(404);
 				return;
 			}
 
-
-			if (!document.triples) {
-				res.send(404);
+			if (document.deleted) {
+				res.send(410);
 				return;
 			}
 
@@ -250,6 +261,32 @@ module.exports = function(app, db, env) {
 			res.send(200);
 		});
 	});
+
+	function createRootContainer() {
+		var triples = [{
+			subject: env.ldpBase,
+			predicate: rdf.type,
+			object: ldp.Resource
+		}, {
+			subject: env.ldpBase,
+			predicate: rdf.type,
+			object: ldp.RDFSource
+		}, {
+			subject: env.ldpBase,
+			predicate: rdf.type,
+			object: ldp.BasicContainer
+		}, {
+		   	subject: env.ldpBase,
+			predicate: 'http://purl.org/dc/terms/title',
+    		object: '"LDP.js root container"'
+		} ];
+
+		db.put(env.ldpBase, null, ldp.BasicContainer, triples, function(err) {
+			if (err) {
+				console.log(err.stack);
+			}
+		});
+	}
 
 	function parse(req, resourceURI, callback) {
 		var parser = N3.Parser();
