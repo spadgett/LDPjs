@@ -335,7 +335,9 @@ module.exports = function(app, db, env) {
 			uri += '/';
 		}
 
-		return uri + encodeURIComponent(path);
+		// remove special characters from the string (e.g., '/', '..', '?')
+		var lastSegment = path.replace(/[^\w\s\-_]/gi, '');
+		return uri + encodeURIComponent(lastSegment);
 	}
 
 	function uniqueURI(container, callback) {
