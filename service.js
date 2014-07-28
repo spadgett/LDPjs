@@ -147,9 +147,13 @@ module.exports = function(app, db, env) {
 								return;
 							}
 
+							// remove any containment triples from the container itself as we
+							// store containment as metadata with the resources themselves
+							var filteredTriples = removeContainment(original.interactionModel, triples);
+
 							// we don't support changing from RDFSource to container or back
 							// use the original interaction model
-							db.put(req.fullURL, null, original.interactionModel, triples, function(err) {
+							db.put(req.fullURL, null, original.interactionModel, filteredTriples, function(err) {
 								if (err) {
 									console.log(err.stack);
 									res.send(500);
@@ -416,15 +420,26 @@ module.exports = function(app, db, env) {
 			}
 		});
 
-		newTriples.forEach(function(triple) {
+		for (var i = 0; i < newTriples.length; i++) {
+			var triple = newTriples[i];
 			if (triple.subject === originalDocument.name && triple.predicate === ldp.contains) {
 				if (!originalContainment[triple.object]) {
 					return true;
 				}
 				newTotal++;
 			}
-		});
+		}
 
 		return originalTotal !== newTotal;
+	}
+
+	function removeContainment(interactionModel, triples) {
+		if (interactionModel === ldp.BasicContainer) {
+			return triples.filter(function(triple) {
+				return triple.predicate !== ldp.contains;
+			});
+		}
+
+		return triples;
 	}
 };
