@@ -4,7 +4,7 @@ module.exports = function(app, db, env) {
 	app.get('/v', function(req, res, next) {
 		console.log('GET ' + req.path);
 
-		db.graphs.find().toArray(function(err, docs){
+		db.graphs.find({ deleted: { $ne: true } }).toArray(function(err, docs){
 			if (err) {
 				console.log(err.stack);
 				res.send(500);
