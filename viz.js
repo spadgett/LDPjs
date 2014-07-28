@@ -32,10 +32,8 @@ module.exports = function(app, db, env) {
 					var subName = nodeName(d.name);
 					d.triples.forEach(function(t) {
 						var objName = nodeName(t.object);
-						if (nodes[subName] > -1 &&
-							nodes[subName] < jsonRes.nodes.length && 
-							nodes[objName] > -1 &&
-							nodes[objName] < jsonRes.nodes.length) {
+						if (nodes[subName] != undefined && 
+							nodes[objName] != undefined) {
 							var link = {};
 							link.value = 1; // Always 1, why?
 							link.source = nodes[subName];
