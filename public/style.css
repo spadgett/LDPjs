@@ -71,3 +71,9 @@ input[type=checkbox] {
     position: relative;
     bottom: 1px;
 }
+
+blockquote {
+	border: 1px solid #E0CB52;
+	background-color: #FCFAEE;
+	padding: 5px;
+}

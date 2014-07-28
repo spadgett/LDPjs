@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8" />
+	<title>LDP.js</title>
+	<link rel="stylesheet" type="text/css" href="style.css">
+</head>
+
+<body>
+	<h1>LDP.js</h1>
+
+	<p>LDP.js is an LDP server built using <a
+		href="http://nodejs.org">Node.js</a> and <a
+		href="http://www.mongodb.org/">MongoDB</a>. It accepts most any RDF,
+	but does have a few constraints:</p>
+
+	<ul>
+		<li>Turtle is the only media type currently supported</li>
+		<li>LDP.js does not yet support non-RDF source.</li>
+		<li>LDP.js does not support ldp:DirectContainer or ldp:IndirectContainer.</li>
+		<li>Containment triples cannot be modified using PUT as
+		<a href="https://dvcs.w3.org/hg/ldpwg/raw-file/default/ldp.html#ldpc-put-mbrprops">recommended</a>
+		by the LDP 1.0 Candidate Recommendation.</li>
+		<li>The interaction model of a resource cannot be changed by modifying
+		its rdf:type after creation. If the resource was created as a container, it
+		will always be a container.</li>
+	</ul>
+
+	<blockquote><b>DISCLAIMER</b>: This is service is as-is. It could go down at any time and
+	change without warning, in fact it might have already changed while you
+	were reading this. The data behind this services will get scrubbed
+	periodically. If this services gets abused, we will either take it down or
+	restrict access. Play nice.</blockquote>
+</body>
+
+</html>

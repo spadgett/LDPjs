@@ -23,7 +23,8 @@ module.exports = function(app, db, env) {
 	resource.all(function(req, res, next) {
 		// all responses should have Link: <ldp:Resource> rel=type
 		res.links({
-			type: ldp.Resource
+			type: ldp.Resource,
+			describedby: env.appBase + '/public/constraints.html'
 		});
 		next();
 	});
