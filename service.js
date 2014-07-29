@@ -317,7 +317,9 @@ module.exports = function(app, db, env) {
 	}
 
 	function parseTurtle(req, resourceURI, callback) {
-		var parser = N3.Parser();
+		var parser = N3.Parser({
+			documentURI: resourceURI
+		});
 		var triples = [];
 		var interactionModel = ldp.RDFSource;
 		parser.parse(req.rawBody, function(err, triple) {
@@ -327,11 +329,6 @@ module.exports = function(app, db, env) {
 			}
 
 			if (triple) {
-				// resolve the null relative URI
-				if (triple.subject === '') {
-					triple.subject = resourceURI;
-				}
-
 				// if this triple is <> rdf:type ldp:BasicContainer RDF type,
 				// set the interaction model as BasicContainer
 				if (triple.subject === resourceURI
