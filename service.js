@@ -3,10 +3,9 @@ module.exports = function(app, db, env) {
 	var ldp = require('./vocab/ldp.js');			// LDP vocabulary
 	var rdf = require('./vocab/rdf.js');			// RDF vocabulary
 	var media = require('./media.js');				// media types
-	var N3 = require('n3');							// text/turtle
-	var jsonld = require('jsonld');					// application/ld+json
+	var turtle = require('./turtle.js');
+	var jsonld = require('./jsonld.js');
 	var crypto = require('crypto');					// for MD5 (ETags)
-	var context = require('./context.json');		// our JSON-LD context
 
 	// create root container if it doesn't exist
 	db.get(env.ldpBase, function(err, document) {
@@ -52,9 +51,9 @@ module.exports = function(app, db, env) {
 
 			var format;
 			if (req.accepts(media.turtle)) {
-				format = asTurtle;
+				format = turtle.serialize;
 			} else if (req.accepts(media.jsonld) || req.accepts(media.json)) {
-				format = asJSONLD;
+				format = jsonld.serialize;
 			} else {
 				res.send(406);
 				return;
@@ -104,11 +103,11 @@ module.exports = function(app, db, env) {
 		console.log('PUT ' + req.path);
 		var parse, format;
 		if (req.is(media.turtle)) {
-			parse = parseTurtle;
-			format = asTurtle;
+			parse = turtle.parse;
+			format = turtle.serialize;
 		} else if (req.is(media.jsonld) || req.is(media.json)) {
-			parse = parseJSONLD;
-			format = asJSONLD;
+			parse = jsonld.parse;
+			format = jsonld.serialize;
 		} else {
 			res.send(415);
 			return;
@@ -212,9 +211,9 @@ module.exports = function(app, db, env) {
 
 			var parse;
 			if (req.is(media.turtle)) {
-				parse = parseTurtle;
+				parse = turtle.parse;
 			} else if (req.is(media.jsonld) || req.is(media.json)) {
-				parse = parseJSONLD;
+				parse = jsonld.parse;
 			} else {
 				res.send(415);
 				return;
@@ -317,149 +316,8 @@ module.exports = function(app, db, env) {
 		});
 	}
 
-	function parseTurtle(req, resourceURI, callback) {
-		var parser = N3.Parser({
-			documentURI: resourceURI
-		});
-		var triples = [];
-		var interactionModel = ldp.RDFSource;
-		parser.parse(req.rawBody, function(err, triple) {
-			if (err) {
-				callback(err);
-				return;
-			}
-
-			if (triple) {
-				// if this triple is <> rdf:type ldp:BasicContainer RDF type,
-				// set the interaction model as BasicContainer
-				if (triple.subject === resourceURI
-					&& triple.predicate === rdf.type
-					&& triple.object === ldp.BasicContainer) {
-						interactionModel = ldp.BasicContainer;
-				}
-
-				triples.push(triple);
-				return;
-			}
-
-			// when last triple is null, we're done parsing
-			callback(null, triples, interactionModel);
-		});
-	}
-
-	function parseJSONLD(req, resourceURI, callback) {
-		var json = JSON.parse(req.rawBody);
-		jsonld.toRDF(json, { base: resourceURI }, function(err, dataset) {
-			if (err) {
-				callback(err);
-				return;
-			}
-
-			// transform the dataset to the N3.js triples format we use in our database
-			// both libraries use a different internal format unfortunately
-			var result = [];
-			var interactionModel = ldp.RDFSource;
-			for(var graphName in dataset) {
-				var triples = dataset[graphName];
-				// FIXME: what about graph names?
-				triples.forEach(function (triple) {
-					var next = {};
-					next.subject = triple.subject.value;
-					next.predicate = triple.predicate.value;
-					if (triple.object.type === 'IRI' || triple.object.type === 'blank node') {
-						next.object = triple.object.value;
-					} else {
-						var literal = '"' + triple.object.value + '"';
-						if (triple.object.language) {
-							literal += '@' + triple.object.language;
-						} else if (triple.object.datatype && triple.object.datatype !== 'http://www.w3.org/2001/XMLSchema#string') {
-							literal += '^^<' + triple.object.datatype + '>';
-						}
-						next.object = literal;
-					}
-
-					// check for rdf:type to set the interaction model
-					if (next.subject === resourceURI &&
-							next.predicate === rdf.type &&
-							next.object === ldp.BasicContainer) {
-						interactionModel = ldp.BasicContainer;
-					}
-
-					result.push(next);
-				});
-			}
-
-			callback(null, result, interactionModel);
-		});
-	}
-
-	function asTurtle(triples, callback) {
-		var writer = N3.Writer();
-		writer.addTriples(triples);
-		writer.end(function(err, content) {
-			callback(err, media.turtle, content);
-		});
-	}
-
-	function jsonldResource(subject) {
-		return { '@id': subject };
-	}
-
-	function jsonldObject(object) {
-		if (N3.Util.isUri(object) || N3.Util.isBlank(object)) {
-			return jsonldResource(object);
-		}
-
-		var result = {};
-		var value = N3.Util.getLiteralValue(object);
-		result['@value'] = value;
-		var type = N3.Util.getLiteralType(object);
-		if (type && type !== 'http://www.w3.org/2001/XMLSchema#string') {
-			result['@type'] = type;
-		}
-		var language = N3.Util.getLiteralLanguage(object);
-		if (language) {
-			result['@language'] = language;
-		}
-
-		return result;
-	}
-
-	function asJSONLD(triples, callback) {
-		var resources = [];
-		var map = {};
-
-		triples.forEach(function(triple) {
-			var sub = map[triple.subject];
-			if (!sub) {
-				sub = jsonldResource(triple.subject);
-				map[triple.subject] = sub;
-				resources.push(sub);
-			}
-
-			var object;
-			if ((N3.Util.isUri(triple.object) || N3.Util.isBlank(triple.object))
-					&& !map[triple.object]) {
-				object = jsonldResource(triple.object);
-			}
-
-			if (triple.predicate === rdf.type) {
-				jsonld.addValue(sub, '@type', triple.object, { propertyIsArray: true });
-				return;
-			}
-
-			object = jsonldObject(triple.object);
-			jsonld.addValue(sub, triple.predicate, object, { propertyIsArray: true });
-		});
-
-		jsonld.compact(resources, context, function(err, json) {
-			var content = JSON.stringify(json, undefined, 4);
-			callback(null, media.jsonld, content);
-		});
-	}
-
-	function getETag(turtle) {
-		return 'W/"' + crypto.createHash('md5').update(turtle).digest('hex') + '"';
+	function getETag(content) {
+		return 'W/"' + crypto.createHash('md5').update(content).digest('hex') + '"';
 	}
 
 	function addHeaders(res, interactionModel) {
@@ -471,7 +329,7 @@ module.exports = function(app, db, env) {
 			});
 
 			allow += ',POST';
-			res.set('Accept-Post', media.turtle);
+			res.set('Accept-Post', media.turtle + ',' + media.jsonld);
 		}
 
 		res.set('Allow', allow);
