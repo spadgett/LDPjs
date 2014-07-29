@@ -6,6 +6,7 @@ module.exports = function(app, db, env) {
 	var N3 = require('n3');							// text/turtle
 	var jsonld = require('jsonld');					// application/ld+json
 	var crypto = require('crypto');					// for MD5 (ETags)
+	var context = require('./context.json');		// our JSON-LD context
 
 	// create root container if it doesn't exist
 	db.get(env.ldpBase, function(err, document) {
@@ -373,7 +374,7 @@ module.exports = function(app, db, env) {
 						var literal = '"' + triple.object.value + '"';
 						if (triple.object.language) {
 							literal += '@' + triple.object.language;
-						} else if (triple.object.datatype) {
+						} else if (triple.object.datatype && triple.object.datatype !== 'http://www.w3.org/2001/XMLSchema#string') {
 							literal += '^^<' + triple.object.datatype + '>';
 						}
 						next.object = literal;
@@ -411,7 +412,7 @@ module.exports = function(app, db, env) {
 		var value = N3.Util.getLiteralValue(object);
 		result['@value'] = value;
 		var type = N3.Util.getLiteralType(object);
-		if (type) {
+		if (type && type !== 'http://www.w3.org/2001/XMLSchema#string') {
 			result['@type'] = type;
 		}
 		var language = N3.Util.getLiteralLanguage(object);
@@ -452,13 +453,10 @@ module.exports = function(app, db, env) {
 			jsonld.addValue(sub, triple.predicate, object, { propertyIsArray: true });
 		});
 
-		var content;
-		if (resources.length === 1) {
-			content = JSON.stringify(resources[0], undefined, 4);
-		} else {
-			content = JSON.stringify(resources, undefined, 4);
-		}
-		callback(null, media.jsonld, content);
+		jsonld.compact(resources, context, function(err, json) {
+			var content = JSON.stringify(json, undefined, 4);
+			callback(null, media.jsonld, content);
+		});
 	}
 
 	function getETag(turtle) {
