@@ -32,6 +32,7 @@ module.exports = function(app, db, env) {
 	});
 
 	function get(req, res, includeBody) {
+		res.set('Vary', 'Accept');
 		db.get(req.fullURL, function(err, document) {
 			if (err) {
 				console.log(err.stack);
