@@ -329,7 +329,7 @@ module.exports = function(app, db, env) {
 			});
 
 			allow += ',POST';
-			res.set('Accept-Post', media.turtle + ',' + media.jsonld);
+			res.set('Accept-Post', media.turtle + ',' + media.jsonld + ',' + media.json);
 		}
 
 		res.set('Allow', allow);
