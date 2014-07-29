@@ -49,7 +49,7 @@ exports.parse = function (req, resourceURI, callback) {
 
 		callback(null, result, interactionModel);
 	});
-}
+};
 
 function jsonldResource(subject) {
 	return { '@id': subject };
@@ -88,8 +88,7 @@ exports.serialize = function(triples, callback) {
 		}
 
 		var object;
-		if ((N3.Util.isUri(triple.object) || N3.Util.isBlank(triple.object))
-				&& !map[triple.object]) {
+		if ((N3.Util.isUri(triple.object) || N3.Util.isBlank(triple.object)) && !map[triple.object]) {
 			object = jsonldResource(triple.object);
 		}
 
@@ -103,8 +102,11 @@ exports.serialize = function(triples, callback) {
 	});
 
 	jsonld.compact(resources, context, function(err, json) {
+		if (err) {
+			callback(err);
+		}
+
 		var content = JSON.stringify(json, undefined, 4);
 		callback(null, media.jsonld, content);
 	});
-}
-
+};

@@ -5,7 +5,6 @@
 // This sample application uses express as web application framework (http://expressjs.com/).
 
 var express = require('express');
-var url = require('url');
 var env = require('./env.js');
 
 console.log("configuration:");

@@ -18,7 +18,7 @@ exports.init = function(env, callback) {
 		});
 		callback(err);
     });
-}
+};
 
 exports.reserveURI = function(uri, callback) {
 	// simply create a document with only a URI. we will just update it later on put

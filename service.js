@@ -1,5 +1,4 @@
 module.exports = function(app, db, env) {
-	var url = require('url');
 	var ldp = require('./vocab/ldp.js');			// LDP vocabulary
 	var rdf = require('./vocab/rdf.js');			// RDF vocabulary
 	var media = require('./media.js');				// media types
@@ -121,6 +120,11 @@ module.exports = function(app, db, env) {
 
 			// get the resource to check if it exists and check its ETag
 			db.get(req.fullURL, function(err, original) {
+				if (err) {
+					console.log(err.stack);
+					res.send(500);
+				}
+
 				if (original) {
 					if (original.deleted) {
 						res.send(410);
@@ -175,7 +179,7 @@ module.exports = function(app, db, env) {
 									return;
 								}
 
-								res.send(original ? 204 : 201)
+								res.send(204);
 							});
 						});
 					});
@@ -188,7 +192,7 @@ module.exports = function(app, db, env) {
 							return;
 						}
 
-						res.send(original ? 204 : 201)
+						res.send(201);
 					});
 				}
 			});
