@@ -403,11 +403,15 @@ module.exports = function(app, db, env) {
 		});
 	}
 
-	function jsonResource(subject) {
+	function jsonldResource(subject) {
 		return { '@id': subject };
 	}
 
-	function jsonLiteral(object) {
+	function jsonldObject(object) {
+		if (N3.Util.isUri(object) || N3.Util.isBlank(object)) {
+			return jsonldResource(object);
+		}
+
 		var result = {};
 		var value = N3.Util.getLiteralValue(object);
 		result['@value'] = value;
@@ -430,7 +434,7 @@ module.exports = function(app, db, env) {
 		triples.forEach(function(triple) {
 			var sub = map[triple.subject];
 			if (!sub) {
-				sub = jsonResource(triple.subject);
+				sub = jsonldResource(triple.subject);
 				map[triple.subject] = sub;
 				resources.push(sub);
 			}
@@ -438,8 +442,7 @@ module.exports = function(app, db, env) {
 			var object;
 			if ((N3.Util.isUri(triple.object) || N3.Util.isBlank(triple.object))
 					&& !map[triple.object]) {
-				object = jsonResource(triple.object);
-				map[triple.object] = object;
+				object = jsonldResource(triple.object);
 			}
 
 			if (triple.predicate === rdf.type) {
@@ -447,9 +450,7 @@ module.exports = function(app, db, env) {
 				return;
 			}
 
-			if (!object) {
-				object = jsonLiteral(triple.object);
-			}
+			object = jsonldObject(triple.object);
 			jsonld.addValue(sub, triple.predicate, object, { propertyIsArray: true });
 		});
 
