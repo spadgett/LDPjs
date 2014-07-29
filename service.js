@@ -3,7 +3,8 @@ module.exports = function(app, db, env) {
 	var ldp = require('./vocab/ldp.js');			// LDP vocabulary
 	var rdf = require('./vocab/rdf.js');			// RDF vocabulary
 	var media = require('./media.js');				// media types
-	var N3 = require('n3');
+	var N3 = require('n3');							// text/turtle
+	var jsonld = require('jsonld');					// application/ld+json
 	var crypto = require('crypto');					// for MD5 (ETags)
 
 	// create root container if it doesn't exist
@@ -47,7 +48,12 @@ module.exports = function(app, db, env) {
 				return;
 			}
 
-			if (!req.accepts(media.turtle)) {
+			var format;
+			if (req.accepts(media.turtle)) {
+				format = asTurtle;
+			} else if (req.accepts(media.jsonld) || req.accepts(media.json)) {
+				format = asJSONLD;
+			} else {
 				res.send(406);
 				return;
 			}
@@ -60,19 +66,19 @@ module.exports = function(app, db, env) {
 					return;
 				}
 
-				asTurtle(document.triples, function(err, turtle) {
+				format(document.triples, function(err, contentType, content) {
 					if (err) {
 						res.send(500);
 					} else {
-						var eTag = getETag(turtle);
+						var eTag = getETag(content);
 						if (req.get('If-None-Match') === eTag) {
 							res.send(304);
 							return;
 						}
 
-						res.writeHead(200, { 'ETag': eTag, 'Content-Type': media.turtle });
+						res.writeHead(200, { 'ETag': eTag, 'Content-Type': contentType });
 						if (includeBody) {
-							res.end(new Buffer(turtle), 'utf-8');
+							res.end(new Buffer(content), 'utf-8');
 						} else {
 							res.end();
 						}
@@ -94,7 +100,14 @@ module.exports = function(app, db, env) {
 
 	resource.put(function(req, res, next) {
 		console.log('PUT ' + req.path);
-		if (!req.is('text/turtle')) {
+		var parse, format;
+		if (req.is(media.turtle)) {
+			parse = parseTurtle;
+			format = asTurtle;
+		} else if (req.is(media.jsonld) || req.is(media.json)) {
+			parse = parseJSONLD;
+			format = asJSONLD;
+		} else {
 			res.send(415);
 			return;
 		}
@@ -130,14 +143,14 @@ module.exports = function(app, db, env) {
 						}
 
 						// calculate the ETag from the text/turtle representation
-						asTurtle(original.triples, function(err, turtle) {
+						format(original.triples, function(err, contentType, content) {
 							if (err) {
 								console.log(err.stack);
 								res.send(500);
 								return;
 							}
 
-							var eTag = getETag(turtle);
+							var eTag = getETag(content);
 							if (ifMatch !== eTag) {
 								res.send(412);
 								return;
@@ -183,11 +196,6 @@ module.exports = function(app, db, env) {
 
 	resource.post(function(req, res, next) {
 		console.log('POST ' + req.path);
-		if (!req.is('text/turtle')) {
-			res.send(415);
-			return;
-		}
-
 		db.isContainer(req.fullURL, function(err, result) {
 			if (err) {
 				console.log(err.stack);
@@ -197,6 +205,16 @@ module.exports = function(app, db, env) {
 
 			if (!result) {
 				res.send(409);
+				return;
+			}
+
+			var parse;
+			if (req.is(media.turtle)) {
+				parse = parseTurtle;
+			} else if (req.is(media.jsonld) || req.is(media.json)) {
+				parse = parseJSONLD;
+			} else {
+				res.send(415);
 				return;
 			}
 
@@ -252,13 +270,13 @@ module.exports = function(app, db, env) {
 				return;
 			}
 
-			if (document.deleted) {
-				res.send(410);
+			if (!document) {
+				res.send(404);
 				return;
 			}
 
-			if (!document.triples) {
-				res.send(404);
+			if (document.deleted) {
+				res.send(410);
 				return;
 			}
 
@@ -288,7 +306,7 @@ module.exports = function(app, db, env) {
 		   	subject: env.ldpBase,
 			predicate: 'http://purl.org/dc/terms/title',
     		object: '"LDP.js root container"'
-		} ];
+		}];
 
 		db.put(env.ldpBase, null, ldp.BasicContainer, triples, function(err) {
 			if (err) {
@@ -297,7 +315,7 @@ module.exports = function(app, db, env) {
 		});
 	}
 
-	function parse(req, resourceURI, callback) {
+	function parseTurtle(req, resourceURI, callback) {
 		var parser = N3.Parser();
 		var triples = [];
 		var interactionModel = ldp.RDFSource;
@@ -311,7 +329,6 @@ module.exports = function(app, db, env) {
 				// resolve the null relative URI
 				if (triple.subject === '') {
 					triple.subject = resourceURI;
-
 				}
 
 				// if this triple is <> rdf:type ldp:BasicContainer RDF type,
@@ -326,14 +343,122 @@ module.exports = function(app, db, env) {
 				return;
 			}
 
+			// when last triple is null, we're done parsing
 			callback(null, triples, interactionModel);
+		});
+	}
+
+	function parseJSONLD(req, resourceURI, callback) {
+		var json = JSON.parse(req.rawBody);
+		jsonld.toRDF(json, { base: resourceURI }, function(err, dataset) {
+			if (err) {
+				callback(err);
+				return;
+			}
+
+			// transform the dataset to the N3.js triples format we use in our database
+			// both libraries use a different internal format unfortunately
+			var result = [];
+			var interactionModel = ldp.RDFSource;
+			for(var graphName in dataset) {
+				var triples = dataset[graphName];
+				// FIXME: what about graph names?
+				triples.forEach(function (triple) {
+					var next = {};
+					next.subject = triple.subject.value;
+					next.predicate = triple.predicate.value;
+					if (triple.object.type === 'IRI' || triple.object.type === 'blank node') {
+						next.object = triple.object.value;
+					} else {
+						var literal = '"' + triple.object.value + '"';
+						if (triple.object.language) {
+							literal += '@' + triple.object.language;
+						} else if (triple.object.datatype) {
+							literal += '^^<' + triple.object.datatype + '>';
+						}
+						next.object = literal;
+					}
+
+					// check for rdf:type to set the interaction model
+					if (next.subject === resourceURI &&
+							next.predicate === rdf.type &&
+							next.object === ldp.BasicContainer) {
+						interactionModel = ldp.BasicContainer;
+					}
+
+					result.push(next);
+				});
+			}
+
+			callback(null, result, interactionModel);
 		});
 	}
 
 	function asTurtle(triples, callback) {
 		var writer = N3.Writer();
 		writer.addTriples(triples);
-		writer.end(callback);
+		writer.end(function(err, content) {
+			callback(err, media.turtle, content);
+		});
+	}
+
+	function jsonResource(subject) {
+		return { '@id': subject };
+	}
+
+	function jsonLiteral(object) {
+		var result = {};
+		var value = N3.Util.getLiteralValue(object);
+		result['@value'] = value;
+		var type = N3.Util.getLiteralType(object);
+		if (type) {
+			result['@type'] = type;
+		}
+		var language = N3.Util.getLiteralLanguage(object);
+		if (language) {
+			result['@language'] = language;
+		}
+
+		return result;
+	}
+
+	function asJSONLD(triples, callback) {
+		var resources = [];
+		var map = {};
+
+		triples.forEach(function(triple) {
+			var sub = map[triple.subject];
+			if (!sub) {
+				sub = jsonResource(triple.subject);
+				map[triple.subject] = sub;
+				resources.push(sub);
+			}
+
+			var object;
+			if ((N3.Util.isUri(triple.object) || N3.Util.isBlank(triple.object))
+					&& !map[triple.object]) {
+				object = jsonResource(triple.object);
+				map[triple.object] = object;
+			}
+
+			if (triple.predicate === rdf.type) {
+				jsonld.addValue(sub, '@type', triple.object, { propertyIsArray: true });
+				return;
+			}
+
+			if (!object) {
+				object = jsonLiteral(triple.object);
+			}
+			jsonld.addValue(sub, triple.predicate, object, { propertyIsArray: true });
+		});
+
+		var content;
+		if (resources.length === 1) {
+			content = JSON.stringify(resources[0], undefined, 4);
+		} else {
+			content = JSON.stringify(resources, undefined, 4);
+		}
+		callback(null, media.jsonld, content);
 	}
 
 	function getETag(turtle) {
