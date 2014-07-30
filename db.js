@@ -17,7 +17,7 @@ exports.init = function(env, callback) {
 			}
 		});
 		callback(err);
-    });
+	});
 };
 
 exports.reserveURI = function(uri, callback) {
@@ -36,23 +36,10 @@ exports.releaseURI = function(uri) {
 	});
 };
 
-exports.put = function(uri, containedBy, interactionModel, triples, callback) {
-	var doc = {
-		name: uri,
-		triples: triples
-	};
-
-	if (containedBy) {
-		doc.containedBy = containedBy;
-	}
-
-	if (interactionModel) {
-		doc.interactionModel = interactionModel;
-	}
-
+exports.put = function(doc, callback) {
 	console.log('db.put');
 	console.dir(doc);
-	graphs().update({ name: uri }, doc, { upsert: true, safe: true }, callback);
+	graphs().update({ name: doc.name }, doc, { upsert: true, safe: true }, callback);
 };
 
 exports.get = function(uri, callback) {
@@ -72,7 +59,13 @@ exports.remove = function(uri, callback) {
 };
 
 exports.isContainer = function(uri, callback) {
-	graphs().find( { name: uri, interactionModel: ldp.BasicContainer }, { limit: 1 }).count(function(err, count) {
+	graphs().find({
+		name: uri,
+		$or: [{ interactionModel: ldp.BasicContainer },
+				{ interactionModel: ldp.DirectContainer }]
+	}, {
+		limit: 1
+	}).count(function(err, count) {
 		callback(err, count);
 	});
 };

@@ -58,7 +58,7 @@ module.exports = function(app, db, env) {
 				return;
 			}
 
-			addHeaders(res, document.interactionModel);
+			addHeaders(res, document);
 			addContainment(req, document, function(err) {
 				if (err) {
 					console.log(err.stack);
@@ -112,21 +112,21 @@ module.exports = function(app, db, env) {
 			return;
 		}
 
-		parse(req, req.fullURL, function(err, triples, interactionModel) {
+		parse(req, req.fullURL, function(err, newTriples) {
 			if (err) {
 				res.send(400);
 				return;
 			}
 
 			// get the resource to check if it exists and check its ETag
-			db.get(req.fullURL, function(err, original) {
+			db.get(req.fullURL, function(err, document) {
 				if (err) {
 					console.log(err.stack);
 					res.send(500);
 				}
 
-				if (original) {
-					if (original.deleted) {
+				if (document) {
+					if (document.deleted) {
 						res.send(410);
 						return;
 					}
@@ -140,15 +140,15 @@ module.exports = function(app, db, env) {
 
 					// add containment triples if necessary to calculate the correct ETag
 					// for containers
-					addContainment(req, original, function(err) {
+					addContainment(req, document, function(err) {
 						if (err) {
 							console.log(err.stack);
 							res.send(500);
 							return;
 						}
 
-						// calculate the ETag from the text/turtle representation
-						format(original.triples, function(err, contentType, content) {
+						// calculate the ETag from the matching representation
+						format(document.triples, function(err, contentType, content) {
 							if (err) {
 								console.log(err.stack);
 								res.send(500);
@@ -161,18 +161,21 @@ module.exports = function(app, db, env) {
 								return;
 							}
 
-							if (modifiesContainment(original, triples)) {
+							if (modifiesContainment(document, newTriples)) {
 								res.send(409);
 								return;
 							}
 
-							// remove any containment triples from the container itself as we
-							// store containment as metadata with the resources themselves
-							var filteredTriples = removeContainment(original.interactionModel, triples);
+							// remove any containment triples from the request body if this is a container
+							// then update the document with the new triples
+							// we store containment with the resources themselves, not in the container document
+							document.triples = newTriples;
+							removeContainment(document);
 
-							// we don't support changing from RDFSource to container or back
-							// use the original interaction model
-							db.put(req.fullURL, null, original.interactionModel, filteredTriples, function(err) {
+							// determine if there are changes to the interaction model
+							setInteractionModel(document);
+
+							db.put(document, function(err) {
 								if (err) {
 									console.log(err.stack);
 									res.send(500);
@@ -185,7 +188,12 @@ module.exports = function(app, db, env) {
 					});
 				} else {
 					// create
-					db.put(req.fullURL, null, interactionModel, triples, function(err) {
+					var document = {
+						name: req.fullURL,
+						triples: newTriples
+					};
+					setInteractionModel(document);
+					db.put(document, function(err) {
 						if (err) {
 							console.log(err.stack);
 							res.send(500);
@@ -230,7 +238,7 @@ module.exports = function(app, db, env) {
 					return;
 				}
 
-				parse(req, loc, function(err, triples, interactionModel) {
+				parse(req, loc, function(err, triples) {
 					if (err) {
 						// allow the URI to be used again
 						db.releaseURI(loc);
@@ -238,16 +246,23 @@ module.exports = function(app, db, env) {
 						return;
 					}
 
-					addHeaders(res, interactionModel);
-		   
-					db.put(loc, req.fullURL, interactionModel, triples, function(err) {
+					var document = {
+						name: loc,
+						containedBy: req.fullURL,
+						triples: triples
+					};
+
+					setInteractionModel(document);
+					addHeaders(res, document);
+
+					db.put(document, function(err) {
 						if (err) {
 							console.log(err.stack);
 							res.send(500);
 							return;
 						}
-					
-						res.location(loc).send(201);	
+
+						res.location(loc).send(201);
 					});
 				});
 			});
@@ -285,7 +300,7 @@ module.exports = function(app, db, env) {
 				return;
 			}
 
-			addHeaders(res, document.interactionModel);
+			addHeaders(res, document);
 			res.send(200);
 		});
 	});
@@ -298,22 +313,22 @@ module.exports = function(app, db, env) {
 		}, {
 			subject: env.ldpBase,
 			predicate: rdf.type,
-			object: ldp.RDFSource
-		}, {
-			subject: env.ldpBase,
-			predicate: rdf.type,
 			object: ldp.Container
 		}, {
 			subject: env.ldpBase,
 			predicate: rdf.type,
 			object: ldp.BasicContainer
 		}, {
-		   	subject: env.ldpBase,
+			subject: env.ldpBase,
 			predicate: 'http://purl.org/dc/terms/title',
-    		object: '"LDP.js root container"'
+			object: '"LDP.js root container"'
 		}];
 
-		db.put(env.ldpBase, null, ldp.BasicContainer, triples, function(err) {
+		db.put({
+			name: env.ldpBase,
+			interactionModel: ldp.BasicContainer,
+			triples: triples
+		}, function(err) {
 			if (err) {
 				console.log(err.stack);
 			}
@@ -324,14 +339,11 @@ module.exports = function(app, db, env) {
 		return 'W/"' + crypto.createHash('md5').update(content).digest('hex') + '"';
 	}
 
-	function addHeaders(res, interactionModel) {
+	function addHeaders(res, document) {
 		res.links({ type: ldp.RDFSource });
 		var allow = 'GET,HEAD,PUT,DELETE,OPTIONS';
-		if (interactionModel === ldp.BasicContainer) {
-			res.links({
-				type: ldp.BasicContainer
-			});
-
+		if (isContainer(document)) {
+			res.links({ type: document.interactionModel });
 			allow += ',POST';
 			res.set('Accept-Post', media.turtle + ',' + media.jsonld + ',' + media.json);
 		}
@@ -339,29 +351,97 @@ module.exports = function(app, db, env) {
 		res.set('Allow', allow);
 	}
 
+	function isContainer(document) {
+		return document.interactionModel === ldp.BasicContainer || document.interactionModel === ldp.DirectContainer;
+	}
+
+	function setInteractionModel(document) {
+		var interactionModel = ldp.RDFSource;
+		document.triples.forEach(function(triple) {
+			var s = triple.subject, p = triple.predicate, o = triple.object;
+			if (s !== document.name) {
+				return;
+			}
+
+			// determine the interaction model from the RDF type
+			// direct takes precedence if the resource has both direct and basic RDF types
+			if (p === rdf.type && interactionModel !== ldp.DirectContainer && (o === ldp.BasicContainer || o === ldp.DirectContainer)) {
+				interactionModel = o;
+				return;
+			}
+
+			if (p === ldp.membershipResource) {
+				document.membershipResource = o;
+				return;
+			}
+
+			if (p === ldp.hasMemberRelation) {
+				document.hasMemberRelation = o;
+			}
+
+			if (p === ldp.isMemberOfRelation) {
+				document.isMemberOfRelation = o;
+			}
+		});
+
+		// don't override an existing interaction model
+		if (!document.interactionModel) {
+			document.interactionModel = interactionModel;
+		}
+	}
+
 	// insert containment triples if necessary
 	function addContainment(req, document, callback) {
-		if (document.interactionModel === ldp.BasicContainer) {
-			db.getContainment(req.fullURL, function(err, containment) {
-				if (containment) {
-					containment.forEach(function(resource) {
+		if (!isContainer(document)) {
+			callback();
+			return;
+		}
+
+		db.getContainment(req.fullURL, function(err, containment) {
+			if (err) {
+				callback(err);
+			}
+
+			if (containment) {
+				containment.forEach(function(resource) {
+					document.triples.push({
+						subject: req.fullURL,
+						predicate: ldp.contains,
+						object: resource
+					});
+
+					if (document.interactionModel === ldp.DirectContainer && document.membershipResource && document.hasMemberRelation) {
 						document.triples.push({
-							subject: req.fullURL,
-							predicate: ldp.contains,
+							subject: document.membershipResource,
+							predicate: document.hasMemberRelation,
 							object: resource
 						});
-					});
-				}
-				callback(err);
-			});	
-		} else {
-			callback();
-		}
+					}
+				});
+			}
+
+			if (document.memberResource) {
+				db.get(document.memberResource, function(err, memberResource) {
+					if (err) {
+						callback(err);
+					}
+
+					if (memberResource && memberResource.triples) {
+						// add in all member resource triples
+						document.triples.push.apply(document.triples, memberResource.triples);
+					}
+
+					callback();
+				});
+			} else {
+				callback();
+			}
+		});	
 	}
 
 	function addPath(uri, path) {
 		uri = uri.split("?")[0].split("#")[0];
-	    if (uri.substr(-1) !== '/') {
+		if (uri.substr(-1) !== '/') {
 			uri += '/';
 		}
 
@@ -393,7 +473,7 @@ module.exports = function(app, db, env) {
 	}
 
 	function modifiesContainment(originalDocument, newTriples) {
-		if (originalDocument.interactionModel !== ldp.BasicContainer) {
+		if (!isContainer(originalDocument)) {
 			return false;
 		}
 
@@ -418,13 +498,24 @@ module.exports = function(app, db, env) {
 		return originalTotal !== newTotal;
 	}
 
-	function removeContainment(interactionModel, triples) {
-		if (interactionModel === ldp.BasicContainer) {
-			return triples.filter(function(triple) {
-				return triple.predicate !== ldp.contains;
+	function removeContainment(document) {
+		if (isContainer(document)) {
+			document.triples = document.triples.filter(function(triple) {
+				var s = triple.subject, p = triple.predicate;
+				if (s === document.name && p === ldp.contains) {
+					return false;
+				}
+
+				if (document.interactionModel === ldp.DirectContainer && s === document.membershipResource) {
+					if (document.membershipResource !== document.name) {
+						return false;
+					} else if (p === document.hasMemberRelation) {
+						return false;
+					}
+				}
+
+				return true;
 			});
 		}
-
-		return triples;
 	}
 };

@@ -16,7 +16,6 @@ exports.parse = function (req, resourceURI, callback) {
 		// transform the dataset to the N3.js triples format we use in our database
 		// both libraries use a different internal format unfortunately
 		var result = [];
-		var interactionModel = ldp.RDFSource;
 		for(var graphName in dataset) {
 			var triples = dataset[graphName];
 			// FIXME: what about graph names?
@@ -36,18 +35,11 @@ exports.parse = function (req, resourceURI, callback) {
 					next.object = literal;
 				}
 
-				// check for rdf:type to set the interaction model
-				if (next.subject === resourceURI &&
-						next.predicate === rdf.type &&
-						next.object === ldp.BasicContainer) {
-					interactionModel = ldp.BasicContainer;
-				}
-
 				result.push(next);
 			});
 		}
 
-		callback(null, result, interactionModel);
+		callback(null, result);
 	});
 };
 

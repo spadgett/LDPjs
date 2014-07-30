@@ -18,3 +18,6 @@ define('DirectContainer', ns + 'DirectContainer');
 
 // Properties
 define('contains', ns + 'contains');
+define('membershipResource', ns + 'membershipResource');
+define('hasMemberRelation', ns + 'hasMemberRelation');
+define('isMemberOfRelation', ns + 'isMemberOfRelation');

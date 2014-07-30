@@ -12,31 +12,15 @@ exports.serialize = function(triples, callback) {
 };
 
 exports.parse = function(req, resourceURI, callback) {
-	var parser = N3.Parser({
-		documentURI: resourceURI
-	});
-	var triples = [];
-	var interactionModel = ldp.RDFSource;
+	var parser = N3.Parser({ documentURI: resourceURI }), triples = [];
 	parser.parse(req.rawBody, function(err, triple) {
 		if (err) {
 			callback(err);
-			return;
-		}
-
-		if (triple) {
-			// if this triple is <> rdf:type ldp:BasicContainer RDF type,
-			// set the interaction model as BasicContainer
-			if (triple.subject === resourceURI
-				&& triple.predicate === rdf.type
-				&& triple.object === ldp.BasicContainer) {
-					interactionModel = ldp.BasicContainer;
-			}
-
+		} else if (triple) {
 			triples.push(triple);
-			return;
+		} else {
+			// when last triple is null, we're done parsing
+			callback(null, triples);
 		}
-
-		// when last triple is null, we're done parsing
-		callback(null, triples, interactionModel);
 	});
 }
