@@ -59,7 +59,7 @@ module.exports = function(app, db, env) {
 			}
 
 			addHeaders(res, document);
-			addContainment(req, document, function(err) {
+			insertCalculatedTriples(document, function(err) {
 				if (err) {
 					console.log(err.stack);
 					res.send(500);
@@ -140,7 +140,7 @@ module.exports = function(app, db, env) {
 
 					// add containment triples if necessary to calculate the correct ETag
 					// for containers
-					addContainment(req, document, function(err) {
+					insertCalculatedTriples(document, function(err) {
 						if (err) {
 							console.log(err.stack);
 							res.send(500);
@@ -170,19 +170,33 @@ module.exports = function(app, db, env) {
 							// then update the document with the new triples
 							// we store containment with the resources themselves, not in the container document
 							document.triples = newTriples;
-							removeContainment(document);
 
 							// determine if there are changes to the interaction model
-							setInteractionModel(document);
+							updateInteractionModel(document);
 
-							db.put(document, function(err) {
+							// check the membership triple pattern if this is a direct container
+							if (!isMembershipPatternValid(document)) {
+								res.send(409);
+								return;
+							}
+
+							// remove any calculated triples from the new content so we don't store them
+							removeCalculatedTriples(document, function(err) {
 								if (err) {
 									console.log(err.stack);
 									res.send(500);
 									return;
 								}
 
-								res.send(204);
+								db.put(document, function(err) {
+									if (err) {
+										console.log(err.stack);
+										res.send(500);
+										return;
+									}
+
+									res.send(204);
+								});
 							});
 						});
 					});
@@ -192,7 +206,20 @@ module.exports = function(app, db, env) {
 						name: req.fullURL,
 						triples: newTriples
 					};
-					setInteractionModel(document);
+					updateInteractionModel(document);
+
+					// check if the client requested a specific interaction model through a Link header
+					// if so, override what we found from the RDF content
+					if (hasResourceLink(req)) {
+						document.interactionModel = ldp.RDFSource;
+					}
+
+					// check the membership triple pattern if this is a direct container
+					if (!isMembershipPatternValid(document)) {
+						res.send(409);
+						return;
+					}
+
 					db.put(document, function(err) {
 						if (err) {
 							console.log(err.stack);
@@ -252,7 +279,8 @@ module.exports = function(app, db, env) {
 						triples: triples
 					};
 
-					setInteractionModel(document);
+					updateInteractionModel(document);
+					addHeaders(res, document);
 
 					// check if the client requested a specific interaction model through a Link header
 					// if so, override what we found from the RDF content
@@ -260,10 +288,18 @@ module.exports = function(app, db, env) {
 						document.interactionModel = ldp.RDFSource;
 					}
 
-					addHeaders(res, document);
+					// check the membership triple pattern if this is a direct container
+					if (!isMembershipPatternValid(document)) {
+						db.releaseURI(loc);
+						res.send(409);
+						return;
+					}
+
+					// create the resource
 					db.put(document, function(err) {
 						if (err) {
 							console.log(err.stack);
+							db.releaseURI(loc);
 							res.send(500);
 							return;
 						}
@@ -366,7 +402,9 @@ module.exports = function(app, db, env) {
 		return document.interactionModel === ldp.BasicContainer || document.interactionModel === ldp.DirectContainer;
 	}
 
-	function setInteractionModel(document) {
+	// look at the triples to determine the type of container if this is a
+	// container and, if a direct container, its membership pattern
+	function updateInteractionModel(document) {
 		var interactionModel = ldp.RDFSource;
 		document.triples.forEach(function(triple) {
 			var s = triple.subject, p = triple.predicate, o = triple.object;
@@ -401,52 +439,102 @@ module.exports = function(app, db, env) {
 		}
 	}
 
-	// insert containment triples if necessary
-	function addContainment(req, document, callback) {
-		if (!isContainer(document)) {
-			callback();
-			return;
-		}
-
-		db.getContainment(req.fullURL, function(err, containment) {
+	// determine if this is a membership resource
+	// if it is, insert the membership triples
+	function insertMembership(document, callback) {
+		db.getContainersUsingMembershipResource(document.name, function(err, containers) {
 			if (err) {
 				callback(err);
+				return;
 			}
 
-			if (containment) {
-				containment.forEach(function(resource) {
-					document.triples.push({
-						subject: req.fullURL,
-						predicate: ldp.contains,
-						object: resource
-					});
-
-					if (document.interactionModel === ldp.DirectContainer && document.membershipResource && document.hasMemberRelation) {
-						document.triples.push({
-							subject: document.membershipResource,
-							predicate: document.hasMemberRelation,
-							object: resource
-						});
-					}
-				});
-			}
-
-			if (document.memberResource) {
-				db.get(document.memberResource, function(err, memberResource) {
-					if (err) {
-						callback(err);
-					}
-
-					if (memberResource && memberResource.triples) {
-						// add in all member resource triples
-						document.triples.push.apply(document.triples, memberResource.triples);
-					}
-
-					callback();
-				});
-			} else {
+			if (!containers || !containers.length) {
 				callback();
 			}
+
+			var inserted = 0;
+			for (var i = 0; i < containers.length; i++) {
+				(function(container) {
+					db.getContainment(container.name, function(err, containment) {
+						if (err) {
+							callback(err);
+							return;
+						}
+
+						if (containment) {
+							containment.forEach(function(resource) {
+								document.triples.push({
+									subject: document.name,
+									predicate: container.hasMemberRelation,
+									object: resource
+								});
+							});
+						}
+
+						if (++inserted === containers.length) {
+							callback();
+						}
+					});
+				})(containers[i]);
+			}
+		});
+	}
+
+	// insert any dynamically calculated triples
+	function insertCalculatedTriples(document, callback) {
+		// insert membership if this is a membership resource
+		insertMembership(document, function(err) {
+			if (err) {
+				callback(err);
+				return;
+			}
+
+			// next insert any dynamic triples if this is a container
+			if (!isContainer(document)) {
+				callback();
+				return;
+			}
+
+			db.getContainment(document.name, function(err, containment) {
+				if (err) {
+					callback(err);
+				}
+
+				if (containment) {
+					containment.forEach(function(resource) {
+						document.triples.push({
+							subject: document.name,
+							predicate: ldp.contains,
+							object: resource
+						});
+
+						if (document.interactionModel === ldp.DirectContainer && document.membershipResource && document.hasMemberRelation) {
+							document.triples.push({
+								subject: document.membershipResource,
+								predicate: document.hasMemberRelation,
+								object: resource
+							});
+						}
+					});
+				}
+
+				if (document.memberResource) {
+					db.get(document.memberResource, function(err, memberResource) {
+						if (err) {
+							callback(err);
+						}
+
+						if (memberResource && memberResource.triples) {
+							// add in all member resource triples
+							document.triples.push.apply(document.triples, memberResource.triples);
+						}
+
+						callback();
+					});
+				} else {
+					callback();
+				}
+			});
 		});	
 	}
 
@@ -509,25 +597,44 @@ module.exports = function(app, db, env) {
 		return originalTotal !== newTotal;
 	}
 
-	function removeContainment(document) {
-		if (isContainer(document)) {
-			document.triples = document.triples.filter(function(triple) {
-				var s = triple.subject, p = triple.predicate;
-				if (s === document.name && p === ldp.contains) {
-					return false;
-				}
+	function removeCalculatedTriples(document, callback) {
+		// remove any membership triples if this is a member resource
+		db.getContainersUsingMembershipResource(document.name, function(err, containers) {
+			if (err) {
+				callback(err);
+			}
 
-				if (document.interactionModel === ldp.DirectContainer && s === document.membershipResource) {
-					if (document.membershipResource !== document.name) {
-						return false;
-					} else if (p === document.hasMemberRelation) {
+			if (containers) {
+				containers.forEach(function(container) {
+					document.triples = document.triples.filter(function(triple) {
+						return triple.subject !== document.name || 
+							triple.predicate !== container.hasMemberRelation;
+					});
+				});
+			}
+
+			// next remove any containment triples if this is a container
+			if (isContainer(document)) {
+				document.triples = document.triples.filter(function(triple) {
+					var s = triple.subject, p = triple.predicate;
+					if (s === document.name && p === ldp.contains) {
 						return false;
 					}
-				}
 
-				return true;
-			});
-		}
+					if (document.interactionModel === ldp.DirectContainer && s === document.membershipResource) {
+						if (document.membershipResource !== document.name) {
+							return false;
+						} else if (p === document.hasMemberRelation) {
+							return false;
+						}
+					}
+
+					return true;
+				});
+			}
+
+			callback();
+		});
 	}
 
 	function hasResourceLink(req) {
@@ -540,5 +647,29 @@ module.exports = function(app, db, env) {
 		return link &&
 			/<\s*http:\/\/www\.w3\.org\/ns\/ldp#Resource\s*\>\s*;\s*rel\s*=\s*(("\s*([^"]+\s+)*type(\s+[^"]+)*\s*")|\s*type\s*)/
 				.test(link);
+	}
+
+	// check the consistency of the membership triple pattern if this is a direct container
+	function isMembershipPatternValid(document) {
+		if (document.interactionModel !== ldp.DirectContainer) {
+			// not a direct container, nothing to do
+			return true;
+		}
+
+		// must have a membership resouce
+		if (!document.membershipResource) {
+			return false;
+		}
+
+		// must have hasMemberRelation or isMemberOfRelation, but can't have both
+		if (document.hasMemberRelation) {
+			return !document.isMemberOfRelation;
+		}
+		if (document.isMemberOfRelation) {
+			return !document.hasMemberRelation;
+		}
+
+		// no membership triple pattern
+		return false;
 	}
 };
