@@ -319,6 +319,10 @@ module.exports = function(app, db, env) {
 		}, {
 			subject: env.ldpBase,
 			predicate: rdf.type,
+			object: ldp.RDFSource
+		}, {
+			subject: env.ldpBase,
+			predicate: rdf.type,
 			object: ldp.Container
 		}, {
 			subject: env.ldpBase,
