@@ -1,10 +1,10 @@
 module.exports = function(app, db, env) {
-	var ldp = require('./vocab/ldp.js');			// LDP vocabulary
-	var rdf = require('./vocab/rdf.js');			// RDF vocabulary
-	var media = require('./media.js');				// media types
+	var ldp = require('./vocab/ldp.js'); // LDP vocabulary
+	var rdf = require('./vocab/rdf.js'); // RDF vocabulary
+	var media = require('./media.js'); // media types
 	var turtle = require('./turtle.js');
 	var jsonld = require('./jsonld.js');
-	var crypto = require('crypto');					// for MD5 (ETags)
+	var crypto = require('crypto'); // for MD5 (ETags)
 
 	// create root container if it doesn't exist
 	db.get(env.ldpBase, function(err, document) {
@@ -76,7 +76,10 @@ module.exports = function(app, db, env) {
 							return;
 						}
 
-						res.writeHead(200, { 'ETag': eTag, 'Content-Type': contentType });
+						res.writeHead(200, {
+							'ETag': eTag,
+							'Content-Type': contentType
+						});
 						if (includeBody) {
 							res.end(new Buffer(content), 'utf-8');
 						} else {
@@ -388,11 +391,15 @@ module.exports = function(app, db, env) {
 	function addHeaders(res, document) {
 		var allow = 'GET,HEAD,PUT,DELETE,OPTIONS';
 		if (isContainer(document)) {
-			res.links({ type: document.interactionModel });
+			res.links({
+				type: document.interactionModel
+			});
 			allow += ',POST';
 			res.set('Accept-Post', media.turtle + ',' + media.jsonld + ',' + media.json);
 		} else {
-			res.links({ type: ldp.RDFSource });
+			res.links({
+				type: ldp.RDFSource
+			});
 		}
 
 		res.set('Allow', allow);
@@ -407,7 +414,9 @@ module.exports = function(app, db, env) {
 	function updateInteractionModel(document) {
 		var interactionModel = ldp.RDFSource;
 		document.triples.forEach(function(triple) {
-			var s = triple.subject, p = triple.predicate, o = triple.object;
+			var s = triple.subject,
+				p = triple.predicate,
+				o = triple.object;
 			if (s !== document.name) {
 				return;
 			}
@@ -535,7 +544,7 @@ module.exports = function(app, db, env) {
 					callback();
 				}
 			});
-		});	
+		});
 	}
 
 	function addPath(uri, path) {
@@ -576,7 +585,9 @@ module.exports = function(app, db, env) {
 			return false;
 		}
 
-		var originalTotal = 0, newTotal = 0, originalContainment = {};
+		var originalTotal = 0,
+			newTotal = 0,
+			originalContainment = {};
 		originalDocument.triples.forEach(function(triple) {
 			if (triple.subject === originalDocument.name && triple.predicate === ldp.contains) {
 				originalContainment[triple.object] = 1;
@@ -607,7 +618,7 @@ module.exports = function(app, db, env) {
 			if (containers) {
 				containers.forEach(function(container) {
 					document.triples = document.triples.filter(function(triple) {
-						return triple.subject !== document.name || 
+						return triple.subject !== document.name ||
 							triple.predicate !== container.hasMemberRelation;
 					});
 				});
@@ -616,7 +627,8 @@ module.exports = function(app, db, env) {
 			// next remove any containment triples if this is a container
 			if (isContainer(document)) {
 				document.triples = document.triples.filter(function(triple) {
-					var s = triple.subject, p = triple.predicate;
+					var s = triple.subject,
+						p = triple.predicate;
 					if (s === document.name && p === ldp.contains) {
 						return false;
 					}
@@ -640,13 +652,13 @@ module.exports = function(app, db, env) {
 	function hasResourceLink(req) {
 		var link = req.get('Link');
 		// look for links like
-		//   <http://www.w3.org/ns/ldp#Resource>; rel="type"
+		//	 <http://www.w3.org/ns/ldp#Resource>; rel="type"
 		// these are also valid
-		//   <http://www.w3.org/ns/ldp#Resource>;rel=type
-		//   <http://www.w3.org/ns/ldp#Resource>; rel="type http://example.net/relation/other"
+		//	 <http://www.w3.org/ns/ldp#Resource>;rel=type
+		//	 <http://www.w3.org/ns/ldp#Resource>; rel="type http://example.net/relation/other"
 		return link &&
 			/<\s*http:\/\/www\.w3\.org\/ns\/ldp#Resource\s*\>\s*;\s*rel\s*=\s*(("\s*([^"]+\s+)*type(\s+[^"]+)*\s*")|\s*type\s*)/
-				.test(link);
+			.test(link);
 	}
 
 	// check the consistency of the membership triple pattern if this is a direct container
