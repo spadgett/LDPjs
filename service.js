@@ -340,12 +340,13 @@ module.exports = function(app, db, env) {
 	}
 
 	function addHeaders(res, document) {
-		res.links({ type: ldp.RDFSource });
 		var allow = 'GET,HEAD,PUT,DELETE,OPTIONS';
 		if (isContainer(document)) {
 			res.links({ type: document.interactionModel });
 			allow += ',POST';
 			res.set('Accept-Post', media.turtle + ',' + media.jsonld + ',' + media.json);
+		} else {
+			res.links({ type: ldp.RDFSource });
 		}
 
 		res.set('Allow', allow);
