@@ -253,8 +253,14 @@ module.exports = function(app, db, env) {
 					};
 
 					setInteractionModel(document);
-					addHeaders(res, document);
 
+					// check if the client requested a specific interaction model through a Link header
+					// if so, override what we found from the RDF content
+					if (hasResourceLink(req)) {
+						document.interactionModel = ldp.RDFSource;
+					}
+
+					addHeaders(res, document);
 					db.put(document, function(err) {
 						if (err) {
 							console.log(err.stack);
@@ -518,5 +524,17 @@ module.exports = function(app, db, env) {
 				return true;
 			});
 		}
+	}
+
+	function hasResourceLink(req) {
+		var link = req.get('Link');
+		// look for links like
+		//   <http://www.w3.org/ns/ldp#Resource>; rel="type"
+		// these are also valid
+		//   <http://www.w3.org/ns/ldp#Resource>;rel=type
+		//   <http://www.w3.org/ns/ldp#Resource>; rel="type http://example.net/relation/other"
+		return link &&
+			/<\s*http:\/\/www\.w3\.org\/ns\/ldp#Resource\s*\>\s*;\s*rel\s*=\s*(("\s*([^"]+\s+)*type(\s+[^"]+)*\s*")|\s*type\s*)/
+				.test(link);
 	}
 };
