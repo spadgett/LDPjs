@@ -101,6 +101,113 @@ module.exports = function(app, db, env) {
 		get(req, res, false);
 	});
 
+	function putUpdate(req, res, document, newTriples, serialize) {
+		var ifMatch = req.get('If-Match');
+		if (!ifMatch) {
+			res.send(428);
+			return;
+		}
+
+		// add containment triples if necessary to calculate the correct ETag
+		// for containers
+		insertCalculatedTriples(document, function(err) {
+			if (err) {
+				console.log(err.stack);
+				res.send(500);
+				return;
+			}
+
+			if (req.is(media.turtle)) {
+				serialize = turtle.serialize;
+			} else {
+				serialize = jsonld.serialize;
+			}
+
+			// calculate the ETag from the matching representation
+			serialize(document.triples, function(err, contentType, content) {
+				if (err) {
+					console.log(err.stack);
+					res.send(500);
+					return;
+				}
+
+				var eTag = getETag(content);
+				if (ifMatch !== eTag) {
+					res.send(412);
+					return;
+				}
+
+				if (modifiesContainment(document, newTriples)) {
+					res.send(409);
+					return;
+				}
+
+				// remove any containment triples from the request body if this is a container
+				// then update the document with the new triples
+				// we store containment with the resources themselves, not in the container document
+				document.triples = newTriples;
+
+				// determine if there are changes to the interaction model
+				updateInteractionModel(document);
+
+				// check the membership triple pattern if this is a direct container
+				if (!isMembershipPatternValid(document)) {
+					res.send(409);
+					return;
+				}
+
+				// remove any calculated triples from the new content so we don't store them
+				removeCalculatedTriples(document, function(err) {
+					if (err) {
+						console.log(err.stack);
+						res.send(500);
+						return;
+					}
+
+					db.put(document, function(err) {
+						if (err) {
+							console.log(err.stack);
+							res.send(500);
+							return;
+						}
+
+						res.send(204);
+					});
+				});
+			});
+		});
+	}
+
+	function putCreate(req, res, triples) {
+		var document = {
+			name: req.fullURL,
+			triples: triples
+		};
+		updateInteractionModel(document);
+
+		// check if the client requested a specific interaction model through a Link header
+		// if so, override what we found from the RDF content
+		if (hasResourceLink(req)) {
+			document.interactionModel = ldp.RDFSource;
+		}
+
+		// check the membership triple pattern if this is a direct container
+		if (!isMembershipPatternValid(document)) {
+			res.send(409);
+			return;
+		}
+
+		db.put(document, function(err) {
+			if (err) {
+				console.log(err.stack);
+				res.send(500);
+				return;
+			}
+
+			res.send(201);
+		});
+	}
+
 	resource.put(function(req, res, next) {
 		console.log('PUT ' + req.path);
 		var parse, serialize;
@@ -134,104 +241,10 @@ module.exports = function(app, db, env) {
 						return;
 					}
 
-					// update
-					var ifMatch = req.get('If-Match');
-					if (!ifMatch) {
-						res.send(428);
-						return;
-					}
-
-					// add containment triples if necessary to calculate the correct ETag
-					// for containers
-					insertCalculatedTriples(document, function(err) {
-						if (err) {
-							console.log(err.stack);
-							res.send(500);
-							return;
-						}
-
-						// calculate the ETag from the matching representation
-						serialize(document.triples, function(err, contentType, content) {
-							if (err) {
-								console.log(err.stack);
-								res.send(500);
-								return;
-							}
-
-							var eTag = getETag(content);
-							if (ifMatch !== eTag) {
-								res.send(412);
-								return;
-							}
-
-							if (modifiesContainment(document, newTriples)) {
-								res.send(409);
-								return;
-							}
-
-							// remove any containment triples from the request body if this is a container
-							// then update the document with the new triples
-							// we store containment with the resources themselves, not in the container document
-							document.triples = newTriples;
-
-							// determine if there are changes to the interaction model
-							updateInteractionModel(document);
-
-							// check the membership triple pattern if this is a direct container
-							if (!isMembershipPatternValid(document)) {
-								res.send(409);
-								return;
-							}
-
-							// remove any calculated triples from the new content so we don't store them
-							removeCalculatedTriples(document, function(err) {
-								if (err) {
-									console.log(err.stack);
-									res.send(500);
-									return;
-								}
-
-								db.put(document, function(err) {
-									if (err) {
-										console.log(err.stack);
-										res.send(500);
-										return;
-									}
-
-									res.send(204);
-								});
-							});
-						});
-					});
+					// the resource exists. update it
+					putUpdate(req, res, document, newTriples, serialize);
 				} else {
-					// create
-					var document = {
-						name: req.fullURL,
-						triples: newTriples
-					};
-					updateInteractionModel(document);
-
-					// check if the client requested a specific interaction model through a Link header
-					// if so, override what we found from the RDF content
-					if (hasResourceLink(req)) {
-						document.interactionModel = ldp.RDFSource;
-					}
-
-					// check the membership triple pattern if this is a direct container
-					if (!isMembershipPatternValid(document)) {
-						res.send(409);
-						return;
-					}
-
-					db.put(document, function(err) {
-						if (err) {
-							console.log(err.stack);
-							res.send(500);
-							return;
-						}
-
-						res.send(201);
-					});
+					putCreate(req, res, newTriples);
 				}
 			});
 		});
