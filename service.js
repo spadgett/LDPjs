@@ -48,11 +48,11 @@ module.exports = function(app, db, env) {
 				return;
 			}
 
-			var format;
+			var serialize;
 			if (req.accepts(media.turtle)) {
-				format = turtle.serialize;
+				serialize = turtle.serialize;
 			} else if (req.accepts(media.jsonld) || req.accepts(media.json)) {
-				format = jsonld.serialize;
+				serialize = jsonld.serialize;
 			} else {
 				res.send(406);
 				return;
@@ -66,7 +66,7 @@ module.exports = function(app, db, env) {
 					return;
 				}
 
-				format(document.triples, function(err, contentType, content) {
+				serialize(document.triples, function(err, contentType, content) {
 					if (err) {
 						res.send(500);
 					} else {
@@ -103,13 +103,13 @@ module.exports = function(app, db, env) {
 
 	resource.put(function(req, res, next) {
 		console.log('PUT ' + req.path);
-		var parse, format;
+		var parse, serialize;
 		if (req.is(media.turtle)) {
 			parse = turtle.parse;
-			format = turtle.serialize;
+			serialize = turtle.serialize;
 		} else if (req.is(media.jsonld) || req.is(media.json)) {
 			parse = jsonld.parse;
-			format = jsonld.serialize;
+			serialize = jsonld.serialize;
 		} else {
 			res.send(415);
 			return;
@@ -151,7 +151,7 @@ module.exports = function(app, db, env) {
 						}
 
 						// calculate the ETag from the matching representation
-						format(document.triples, function(err, contentType, content) {
+						serialize(document.triples, function(err, contentType, content) {
 							if (err) {
 								console.log(err.stack);
 								res.send(500);
