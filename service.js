@@ -247,7 +247,7 @@ module.exports = function(app, db, env) {
 			}
 
 			if (!result) {
-				res.send(409);
+				res.set('Allow', 'GET,HEAD,PUT,DELETE,OPTIONS').send(405);
 				return;
 			}
 
