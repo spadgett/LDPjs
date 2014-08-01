@@ -21,3 +21,9 @@ define('contains', ns + 'contains');
 define('membershipResource', ns + 'membershipResource');
 define('hasMemberRelation', ns + 'hasMemberRelation');
 define('isMemberOfRelation', ns + 'isMemberOfRelation');
+
+// Preferences
+define('PreferContainment', ns + 'PreferContainment');
+define('PreferMembership', ns + 'PreferMembership');
+define('PreferMinimalContainer', ns + 'PreferMinimalContainer');
+define('PreferEmptyContainer', ns + 'PreferEmptyContainer');

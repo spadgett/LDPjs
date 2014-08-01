@@ -59,7 +59,7 @@ module.exports = function(app, db, env) {
 			}
 
 			addHeaders(res, document);
-			insertCalculatedTriples(document, function(err) {
+			insertCalculatedTriples(req, document, function(err, preferenceApplied) {
 				if (err) {
 					console.log(err.stack);
 					res.send(500);
@@ -68,23 +68,29 @@ module.exports = function(app, db, env) {
 
 				serialize(document.triples, function(err, contentType, content) {
 					if (err) {
+						console.log(err.stack);
 						res.send(500);
-					} else {
-						var eTag = getETag(content);
-						if (req.get('If-None-Match') === eTag) {
-							res.send(304);
-							return;
-						}
+						return;
+					}
 
-						res.writeHead(200, {
-							'ETag': eTag,
-							'Content-Type': contentType
-						});
-						if (includeBody) {
-							res.end(new Buffer(content), 'utf-8');
-						} else {
-							res.end();
-						}
+					if (preferenceApplied) {
+						res.set('Preference-Applied', 'return=representation');
+					}
+
+					var eTag = getETag(content);
+					if (req.get('If-None-Match') === eTag) {
+						res.send(304);
+						return;
+					}
+
+					res.writeHead(200, {
+						'ETag': eTag,
+						'Content-Type': contentType
+					});
+					if (includeBody) {
+						res.end(new Buffer(content), 'utf-8');
+					} else {
+						res.end();
 					}
 				});
 			});
@@ -114,7 +120,7 @@ module.exports = function(app, db, env) {
 		}
 
 		// add membership triples if necessary to calculate the correct ETag
-		insertCalculatedTriples(document, function(err) {
+		insertCalculatedTriples(null, document, function(err) {
 			if (err) {
 				console.log(err.stack);
 				res.send(500);
@@ -493,9 +499,17 @@ module.exports = function(app, db, env) {
 
 	// determine if this is a membership resource.  if it is, insert the
 	// membership triples.
-	function insertMembership(document, callback) {
+	function insertMembership(req, document, callback) {
 		var patterns = document.membershipResourceFor;
 		if (patterns) {
+			if (hasPreferOmit(req, ldp.PreferMembership)) {
+				callback(null, true); // preference applied
+				return;
+			}
+
+			// respond with Preference-Applied: return=representation if
+			// membership was explicitly requested
+			var preferenceApplied = hasPreferInclude(req, ldp.PreferMembership);
 			var inserted = 0;
 			patterns.forEach(function(pattern) {
 				db.getContainment(pattern.container, function(err, containment) {
@@ -515,19 +529,19 @@ module.exports = function(app, db, env) {
 					}
 
 					if (++inserted === patterns.length) {
-						callback();
+						callback(null, preferenceApplied);
 					}
 				});
 			});
 		} else {
-			callback();
+			callback(null, false);
 		}
 	}
 
 	// insert any dynamically calculated triples
-	function insertCalculatedTriples(document, callback) {
+	function insertCalculatedTriples(req, document, callback) {
 		// insert membership if this is a membership resource
-		insertMembership(document, function(err) {
+		insertMembership(req, document, function(err, preferenceApplied) {
 			if (err) {
 				callback(err);
 				return;
@@ -535,24 +549,69 @@ module.exports = function(app, db, env) {
 
 			// next insert any dynamic triples if this is a container
 			if (!isContainer(document)) {
-				callback();
+				callback(null, preferenceApplied);
+				return;
+			}
+
+			// check if client is asking for a minimal container
+			var minimal = false;
+			if (hasPreferInclude(req, ldp.PreferMinimalContainer) ||
+					hasPreferInclude(req, ldp.PreferEmptyContainer)) {
+				preferenceApplied = true;
+				minimal = true;
+			}
+
+			// include containment?
+			var includeContainment;
+			if (hasPreferInclude(req, ldp.PreferContainment)) {
+				includeContainment = true;
+				preferenceApplied = true;
+			} else if (hasPreferOmit(req, ldp.PreferContainment)) {
+				includeContainment = false;
+				preferenceApplied = true;
+			} else {
+				includeContainment = !minimal;
+			}
+
+			// include membership?
+			var includeMembership;
+			if (document.interactionModel === ldp.DirectContainer && document.hasMemberRelation) {
+				if (hasPreferInclude(req, ldp.PreferMembership)) {
+					includeMembership = true;
+					preferenceApplied = true;
+				} else if (hasPreferOmit(req, ldp.PreferMembership)) {
+					includeMembership = false;
+					preferenceApplied = true;
+				} else {
+					includeMembership = !minimal;
+				}
+			} else {
+				includeMembership = false;
+			}
+
+			if (!includeContainment && !includeMembership) {
+				// we're done!
+				callback(null, preferenceApplied);
 				return;
 			}
 
 			db.getContainment(document.name, function(err, containment) {
 				if (err) {
 					callback(err);
+					return;
 				}
 
 				if (containment) {
 					containment.forEach(function(resource) {
-						document.triples.push({
-							subject: document.name,
-							predicate: ldp.contains,
-							object: resource
-						});
+						if (includeContainment) {
+							document.triples.push({
+								subject: document.name,
+								predicate: ldp.contains,
+								object: resource
+							});
+						}
 
-						if (document.interactionModel === ldp.DirectContainer && document.membershipResource && document.hasMemberRelation) {
+						if (includeMembership) {
 							document.triples.push({
 								subject: document.membershipResource,
 								predicate: document.hasMemberRelation,
@@ -562,22 +621,7 @@ module.exports = function(app, db, env) {
 					});
 				}
 
-				if (document.memberResource) {
-					db.get(document.memberResource, function(err, memberResource) {
-						if (err) {
-							callback(err);
-						}
-
-						if (memberResource && memberResource.triples) {
-							// add in all member resource triples
-							document.triples.push.apply(document.triples, memberResource.triples);
-						}
-
-						callback();
-					});
-				} else {
-					callback();
-				}
+				callback(null, preferenceApplied);
 			});
 		});
 	}
@@ -645,6 +689,35 @@ module.exports = function(app, db, env) {
 		return link &&
 			/<\s*http:\/\/www\.w3\.org\/ns\/ldp#Resource\s*\>\s*;\s*rel\s*=\s*(("\s*([^"]+\s+)*type(\s+[^"]+)*\s*")|\s*type[\s,$])/
 			.test(link);
+	}
+
+	function hasPreferInclude(req, inclusion) {
+		return hasPrefer(req, 'include', inclusion);
+	}
+
+	function hasPreferOmit(req, omission) {
+		return hasPrefer(req, 'omit', omission);
+	}
+
+	function hasPrefer(req, token, parameter) {
+		if (!req) {
+			return false;
+		}
+
+		var preferHeader = req.get('Prefer');
+		if (!preferHeader) {
+			return false;
+		}
+
+		// from the LDP prefer parameters, the only charcter we need to escape
+		// for regular expressions is '.'
+		// https://dvcs.w3.org/hg/ldpwg/raw-file/default/ldp.html#prefer-parameters
+		var word = parameter.replace(/\./g, '\\.');
+
+		// construct a regex that matches the preference
+		var regex =
+		   	new RegExp(token + '\\s*=\\s*("\\s*([^"]+\\s+)*' + word + '(\\s+[^"]+)*\\s*"|' + word + '$)');
+		return regex.test(preferHeader);
 	}
 
 	// check the consistency of the membership triple pattern if this is a direct container
