@@ -1,10 +1,10 @@
 module.exports = function(app, db, env) {
 	var ldp = require('./vocab/ldp.js'); // LDP vocabulary
 	var rdf = require('./vocab/rdf.js'); // RDF vocabulary
-	var media = require('./media.js'); // media types
+	var media = require('./media.js');	// media types
 	var turtle = require('./turtle.js');
 	var jsonld = require('./jsonld.js');
-	var crypto = require('crypto'); // for MD5 (ETags)
+	var crypto = require('crypto');	// for MD5 (ETags)
 
 	// create root container if it doesn't exist
 	db.get(env.ldpBase, function(err, document) {
@@ -102,14 +102,18 @@ module.exports = function(app, db, env) {
 	});
 
 	function putUpdate(req, res, document, newTriples, serialize) {
+		if (isContainer(document)) {
+			res.set('Allow', 'GET,HEAD,DELETE,OPTIONS,POST').send(405);
+			return;
+		}
+
 		var ifMatch = req.get('If-Match');
 		if (!ifMatch) {
 			res.send(428);
 			return;
 		}
 
-		// add containment triples if necessary to calculate the correct ETag
-		// for containers
+		// add membership triples if necessary to calculate the correct ETag
 		insertCalculatedTriples(document, function(err) {
 			if (err) {
 				console.log(err.stack);
@@ -137,42 +141,27 @@ module.exports = function(app, db, env) {
 					return;
 				}
 
-				if (modifiesContainment(document, newTriples)) {
-					res.send(409);
-					return;
-				}
-
-				// remove any containment triples from the request body if this is a container
-				// then update the document with the new triples
-				// we store containment with the resources themselves, not in the container document
+				// remove any containment triples from the request body if this
+				// is a container.  then update the document with the new
+				// triples.  we store containment with the resources
+				// themselves, not in the container document.
 				document.triples = newTriples;
 
 				// determine if there are changes to the interaction model
 				updateInteractionModel(document);
 
-				// check the membership triple pattern if this is a direct container
-				if (!isMembershipPatternValid(document)) {
-					res.send(409);
-					return;
-				}
+				// remove any membership triples if this is a membership
+				// resource so we don't store them directly
+				removeMembership(document);
 
-				// remove any calculated triples from the new content so we don't store them
-				removeCalculatedTriples(document, function(err) {
+				db.put(document, function(err) {
 					if (err) {
 						console.log(err.stack);
 						res.send(500);
 						return;
 					}
 
-					db.put(document, function(err) {
-						if (err) {
-							console.log(err.stack);
-							res.send(500);
-							return;
-						}
-
-						res.send(204);
-					});
+					res.send(204);
 				});
 			});
 		});
@@ -185,8 +174,8 @@ module.exports = function(app, db, env) {
 		};
 		updateInteractionModel(document);
 
-		// check if the client requested a specific interaction model through a Link header
-		// if so, override what we found from the RDF content
+		// check if the client requested a specific interaction model through a
+		// Link header.  if so, override what we found from the RDF content.
 		if (hasResourceLink(req)) {
 			document.interactionModel = ldp.RDFSource;
 		}
@@ -204,7 +193,17 @@ module.exports = function(app, db, env) {
 				return;
 			}
 
-			res.send(201);
+			// create a membership resource if necessary.
+			createMembershipResource(document, function(err) {
+				if (err) {
+					console.log(err.stack);
+					db.releaseURI(loc);
+					res.send(500);
+					return;
+				}
+
+				res.send(201);
+			});
 		});
 	}
 
@@ -320,7 +319,17 @@ module.exports = function(app, db, env) {
 							return;
 						}
 
-						res.location(loc).send(201);
+						// create a membership resource if necessary.
+						createMembershipResource(document, function(err) {
+							if (err) {
+								console.log(err.stack);
+								db.releaseURI(loc);
+								res.send(500);
+								return;
+							}
+
+							res.location(loc).send(201);
+						});
 					});
 				});
 			});
@@ -397,12 +406,25 @@ module.exports = function(app, db, env) {
 		});
 	}
 
+	// create a membership resource for the container if it's a direct
+	// container and the membership resource is not the container itself
+	function createMembershipResource(document, callback) {
+		if (document.interactionModel === ldp.DirectContainer &&
+			document.membershipResource &&
+			document.membershipResource !== document.name) {
+			// create membership resource
+			db.createMembershipResource(document, callback);
+		} else {
+			callback();
+		}
+	}
+
 	function getETag(content) {
 		return 'W/"' + crypto.createHash('md5').update(content).digest('hex') + '"';
 	}
 
 	function addHeaders(res, document) {
-		var allow = 'GET,HEAD,PUT,DELETE,OPTIONS';
+		var allow = 'GET,HEAD,DELETE,OPTIONS';
 		if (isContainer(document)) {
 			res.links({
 				type: document.interactionModel
@@ -410,9 +432,7 @@ module.exports = function(app, db, env) {
 			allow += ',POST';
 			res.set('Accept-Post', media.turtle + ',' + media.jsonld + ',' + media.json);
 		} else {
-			res.links({
-				type: ldp.RDFSource
-			});
+			allow += ',PUT';
 		}
 
 		res.set('Allow', allow);
@@ -461,45 +481,37 @@ module.exports = function(app, db, env) {
 		}
 	}
 
-	// determine if this is a membership resource
-	// if it is, insert the membership triples
+	// determine if this is a membership resource.  if it is, insert the
+	// membership triples.
 	function insertMembership(document, callback) {
-		db.getContainersUsingMembershipResource(document.name, function(err, containers) {
-			if (err) {
-				callback(err);
-				return;
-			}
-
-			if (!containers || !containers.length) {
-				callback();
-			}
-
+		var patterns = document.membershipResourceFor;
+		if (patterns) {
 			var inserted = 0;
-			for (var i = 0; i < containers.length; i++) {
-				(function(container) {
-					db.getContainment(container.name, function(err, containment) {
-						if (err) {
-							callback(err);
-							return;
-						}
+			patterns.forEach(function(pattern) {
+				db.getContainment(pattern.container, function(err, containment) {
+					if (err) {
+						callback(err);
+						return;
+					}
 
-						if (containment) {
-							containment.forEach(function(resource) {
-								document.triples.push({
-									subject: document.name,
-									predicate: container.hasMemberRelation,
-									object: resource
-								});
+					if (containment) {
+						containment.forEach(function(resource) {
+							document.triples.push({
+								subject: document.name,
+								predicate: pattern.hasMemberRelation,
+								object: resource
 							});
-						}
+						});
+					}
 
-						if (++inserted === containers.length) {
-							callback();
-						}
-					});
-				})(containers[i]);
-			}
-		});
+					if (++inserted === patterns.length) {
+						callback();
+					}
+				});
+			});
+		} else {
+			callback();
+		}
 	}
 
 	// insert any dynamically calculated triples
@@ -593,73 +605,24 @@ module.exports = function(app, db, env) {
 		}
 	}
 
-	function modifiesContainment(originalDocument, newTriples) {
-		if (!isContainer(originalDocument)) {
-			return false;
-		}
-
-		var originalTotal = 0,
-			newTotal = 0,
-			originalContainment = {};
-		originalDocument.triples.forEach(function(triple) {
-			if (triple.subject === originalDocument.name && triple.predicate === ldp.contains) {
-				originalContainment[triple.object] = 1;
-				originalTotal++;
-			}
-		});
-
-		for (var i = 0; i < newTriples.length; i++) {
-			var triple = newTriples[i];
-			if (triple.subject === originalDocument.name && triple.predicate === ldp.contains) {
-				if (!originalContainment[triple.object]) {
-					return true;
+	function removeMembership(document) {
+		if (document.membershipResourceFor) {
+			// find the member relations. handle the case where the resource is
+			// a membership resource for more than one container.
+			var memberRelations = {};
+			document.membershipResourceFor.forEach(function(memberPattern) {
+				if (memberPattern.hasMemberRelation) {
+					memberRelations[memberPattern.hasMemberRelation] = 1;
 				}
-				newTotal++;
-			}
+			});
+
+			// now filter the triples
+			document.triples = document.triples.filter(function(triple) {
+				// keep the triple if the subject is not the membership
+				// resource or the predicate is not one of the member relations
+				return triple.subject !== document.name || !memberRelations[triple.predicate];
+			});
 		}
-
-		return originalTotal !== newTotal;
-	}
-
-	function removeCalculatedTriples(document, callback) {
-		// remove any membership triples if this is a member resource
-		db.getContainersUsingMembershipResource(document.name, function(err, containers) {
-			if (err) {
-				callback(err);
-			}
-
-			if (containers) {
-				containers.forEach(function(container) {
-					document.triples = document.triples.filter(function(triple) {
-						return triple.subject !== document.name ||
-							triple.predicate !== container.hasMemberRelation;
-					});
-				});
-			}
-
-			// next remove any containment triples if this is a container
-			if (isContainer(document)) {
-				document.triples = document.triples.filter(function(triple) {
-					var s = triple.subject,
-						p = triple.predicate;
-					if (s === document.name && p === ldp.contains) {
-						return false;
-					}
-
-					if (document.interactionModel === ldp.DirectContainer && s === document.membershipResource) {
-						if (document.membershipResource !== document.name) {
-							return false;
-						} else if (p === document.hasMemberRelation) {
-							return false;
-						}
-					}
-
-					return true;
-				});
-			}
-
-			callback();
-		});
 	}
 
 	function hasResourceLink(req) {
@@ -670,7 +633,7 @@ module.exports = function(app, db, env) {
 		//	 <http://www.w3.org/ns/ldp#Resource>;rel=type
 		//	 <http://www.w3.org/ns/ldp#Resource>; rel="type http://example.net/relation/other"
 		return link &&
-			/<\s*http:\/\/www\.w3\.org\/ns\/ldp#Resource\s*\>\s*;\s*rel\s*=\s*(("\s*([^"]+\s+)*type(\s+[^"]+)*\s*")|\s*type\s*)/
+			/<\s*http:\/\/www\.w3\.org\/ns\/ldp#Resource\s*\>\s*;\s*rel\s*=\s*(("\s*([^"]+\s+)*type(\s+[^"]+)*\s*")|\s*type[\s,$])/
 			.test(link);
 	}
 

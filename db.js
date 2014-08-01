@@ -126,25 +126,18 @@ exports.getContainment = function(uri, callback) {
 	});
 };
 
-exports.getContainersUsingMembershipResource = function(membershipResource, callback) {
-	// find containers that use this membershipResource with a hasMemberRelation pattern
-	// (only if the member resource and container are the same)
-	graphs().find({
-		name: {
-			$ne: membershipResource
-		},
-		membershipResource: membershipResource,
-		interactionModel: ldp.DirectContainer,
-		deleted: {
-			$ne: true
-		},
-		hasMemberRelation: {
-			$ne: null
+exports.createMembershipResource = function(document, callback) {
+	graphs().update({
+		name: document.membershipResource
+	}, {
+		$push: {
+			membershipResourceFor: {
+				container: document.name,
+				hasMemberRelation: document.hasMemberRelation
+			}
 		}
 	}, {
-		fields: {
-			name: 1,
-			hasMemberRelation: 1,
-		}
-	}).toArray(callback);
+		upsert: true,
+		safe: true
+	}, callback);
 };
