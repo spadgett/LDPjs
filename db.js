@@ -86,7 +86,7 @@ exports.remove = function(uri, callback) {
 	}, callback);
 };
 
-exports.isContainer = function(uri, callback) {
+exports.findContainer = function(uri, callback) {
 	graphs().find({
 		name: uri,
 		$or: [{
@@ -98,9 +98,16 @@ exports.isContainer = function(uri, callback) {
 			$ne: true
 		}
 	}, {
-		limit: 1
-	}).count(function(err, count) {
-		callback(err, count);
+		limit: 1,
+		fields: {
+			name: 1,
+			interactionModel: 1,
+			membershipResource: 1,
+			hasMemberRelation: 1,
+			isMemberOfRelation: 1	
+		}
+	}).toArray(function(err, docs) {
+		callback(err, (docs && docs.length) ? docs[0] : null);
 	});
 };
 

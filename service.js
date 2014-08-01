@@ -251,14 +251,14 @@ module.exports = function(app, db, env) {
 
 	resource.post(function(req, res, next) {
 		console.log('POST ' + req.path);
-		db.isContainer(req.fullURL, function(err, result) {
+		db.findContainer(req.fullURL, function(err, container) {
 			if (err) {
 				console.log(err.stack);
 				res.send(500);
 				return;
 			}
 
-			if (!result) {
+			if (!container) {
 				res.set('Allow', 'GET,HEAD,PUT,DELETE,OPTIONS').send(405);
 				return;
 			}
@@ -308,6 +308,16 @@ module.exports = function(app, db, env) {
 						db.releaseURI(loc);
 						res.send(409);
 						return;
+					}
+
+					// add the "inverse" isMemberOfRelation link if needed
+					if (container.interactionModel === ldp.DirectContainer &&
+							container.isMemberOfRelation) {
+						document.triples.push({
+							subject: loc,
+							predicate: container.isMemberOfRelation,
+							object: req.fullURL
+						});
 					}
 
 					// create the resource
