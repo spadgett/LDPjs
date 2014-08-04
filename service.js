@@ -13,7 +13,7 @@ module.exports = function(app, db, env) {
 			return;
 		}
 
-		if (!document) {
+		if (!document || document.deleted) {
 			createRootContainer();
 		}
 	});
@@ -414,7 +414,8 @@ module.exports = function(app, db, env) {
 		db.put({
 			name: env.ldpBase,
 			interactionModel: ldp.BasicContainer,
-			triples: triples
+			triples: triples,
+			deleted: false
 		}, function(err) {
 			if (err) {
 				console.log(err.stack);
