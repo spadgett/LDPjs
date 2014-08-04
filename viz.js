@@ -5,7 +5,17 @@ module.exports = function(app, db, env) {
 	app.get('/v', function(req, res, next) {
 		console.log('GET ' + req.path);
 
-		db.graphs.find({ deleted: { $ne: true }, 'triples.0': { $exists: true } }).toArray(function(err, docs){
+		db.graphs.find({
+		    deleted: {
+		        $ne: true
+		    },
+		    'triples.0': {
+		        $exists: true
+		    }
+		}, {
+			limit: 1000, // put a reasonable limit on how many we'll process
+			sort: 'name' // try to get the containers (at least the root container)
+		}).toArray(function(err, docs) {
 			if (err) {
 				console.log(err.stack);
 				res.send(500);
