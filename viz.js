@@ -1,11 +1,11 @@
 module.exports = function(app, db, env) {
 	var rdf = require('./vocab/rdf.js');
 	var ldp = require('./vocab/ldp.js');
-	
+
 	app.get('/v', function(req, res, next) {
 		console.log('GET ' + req.path);
 
-		db.graphs.find({ deleted: { $ne: true } }).toArray(function(err, docs){
+		db.graphs.find({ deleted: { $ne: true }, 'triples.0': { $exists: true } }).toArray(function(err, docs){
 			if (err) {
 				console.log(err.stack);
 				res.send(500);
@@ -16,7 +16,7 @@ module.exports = function(app, db, env) {
 			var types = {"none":0};
 			var nextGroupIdx = 1;
 			var jsonRes = { nodes: [], links: [] };
-			
+
 			// First build the array of all nodes (resources/graphs),
 			// keep track of array indexes
 			docs.forEach(function(d){
