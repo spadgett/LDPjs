@@ -98,14 +98,13 @@ exports.findContainer = function(uri, callback) {
 			$ne: true
 		}
 	}, {
-		limit: 1,
-		fields: {
-			name: 1,
-			interactionModel: 1,
-			membershipResource: 1,
-			hasMemberRelation: 1,
-			isMemberOfRelation: 1	
-		}
+		name: 1,
+		interactionModel: 1,
+		membershipResource: 1,
+		hasMemberRelation: 1,
+		isMemberOfRelation: 1	
+	}, {
+		limit: 1
 	}).toArray(function(err, docs) {
 		callback(err, (docs && docs.length) ? docs[0] : null);
 	});
@@ -118,9 +117,7 @@ exports.getContainment = function(uri, callback) {
 			$ne: true
 		}
 	}, {
-		fields: {
-			name: 1
-		}
+		name: 1
 	}).toArray(function(err, docs) {
 		var result = [];
 		if (docs) {
