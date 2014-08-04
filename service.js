@@ -687,7 +687,7 @@ module.exports = function(app, db, env) {
 		//	 <http://www.w3.org/ns/ldp#Resource>;rel=type
 		//	 <http://www.w3.org/ns/ldp#Resource>; rel="type http://example.net/relation/other"
 		return link &&
-			/<\s*http:\/\/www\.w3\.org\/ns\/ldp#Resource\s*\>\s*;\s*rel\s*=\s*(("\s*([^"]+\s+)*type(\s+[^"]+)*\s*")|\s*type[\s,$])/
+			/<http:\/\/www\.w3\.org\/ns\/ldp#Resource\>\s*;\s*rel\s*=\s*(("\s*([^"]+\s+)*type(\s+[^"]+)*\s*")|\s*type[\s,;$])/
 			.test(link);
 	}
 
