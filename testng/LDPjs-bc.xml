@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd">
+<suite name="W3C Linked Data Platform Test Suite">
+    <listeners>
+        <listener class-name='org.w3.ldp.testsuite.reporter.LdpTestListener'/>
+        <listener class-name='org.w3.ldp.testsuite.reporter.LdpHtmlReporter'/>
+        <listener class-name='org.w3.ldp.testsuite.reporter.LdpEarlReporter'/>
+    </listeners>
+    <!-- <parameter name="auth" value="ldpuser:ldpuser" />  -->
+    <parameter name="basicContainer" value="http://ldpjs.mybluemix.net/r/bc"/>
+    <!-- <parameter name="directContainer" value="http://localhost:8080/ldp/resources/dc-simple/" /> -->
+    <!-- <parameter name="indirectContainer" value="http://localhost:8080/ldp/resources/" /> -->
+    
+    <!-- A resource whose internal RDF state has a type triple of one of container types
+         but whose interaction model was created with header on POST request of:
+           Link: <http://www.w3c.org/ldp/ns#Resource>;rel="type"
+         See: http://www.w3.org/TR/ldp/#ldpc-post-createrdf
+      -->
+    <parameter name="containerAsResource" value="http://ldpjs.mybluemix.net/r/bc-asres" />
+    
+    <!-- Default values to plug into Properties in the Earl Report  -->
+    <parameter name="language" value = "JavaScript" />
+    <parameter name="homepage" value ="https://hub.jazz.net/project/sspeiche/LDPjs" />
+    <parameter name="assertor" value="http://stevespeicher.me" />
+    <parameter name="shortname" value="LDP.js Ref Impl" />
+    <parameter name="software" value="Reference Implementation" />
+    <parameter name="mbox" value="spadgett@us.ibm.com" />
+    <parameter name="developer" value="Sam Padgett" />
+    <parameter name="description" value="Testing against: BasicContainer, RDFSource,Prefer, Container as Resource interaction model." />
+    
+
+    <!-- (Optional) RDF member resource parameter. If left out, the tests will
+        try to create a resource in one of the containers. -->
+    <parameter name="memberResource" value="http://ldpjs.mybluemix.net/r/diffmr1"/>
+
+    <!-- (Optional) Read only property to test server errors -->
+    <!-- <parameter name="readOnlyProp" value="http://purl.org/dc/terms/identifier" /> -->
+
+    <test name="All Tests">
+        <groups>
+            <define name="allRequirementLevels">
+                <include name="MUST"/>
+                <include name="SHOULD"/>
+                <include name="MAY"/>
+            </define>
+
+            <run>
+                <include name="allRequirementLevels"/>
+
+                <!-- Include this group if your server supports non-RDF source resources -->
+                <exclude name="NON-RDF"/>
+                
+                <!-- Will just skip the tests but create entries for the reporters -->
+                <include name="MANUAL"/>
+
+                <!-- Include this group if your server uses ldp:member as a membership
+                    predicate for Direct Containers. (See 5.4.1.2 in the LDP spec.) -->
+                <include name="ldpMember"/>
+            </run>
+        </groups>
+        <classes>
+            <!--  <class name="org.w3.ldp.testsuite.test.DirectContainerTest" />  -->
+            <!-- <class name="org.w3.ldp.testsuite.test.IndirectContainerTest" />  -->
+            <class name="org.w3.ldp.testsuite.test.BasicContainerTest"/>
+            <class name="org.w3.ldp.testsuite.test.MemberResourceTest"/>
+            <!-- <class name="org.w3.ldp.testsuite.test.NonRDFSourceTest" /> -->
+        </classes>
+    </test>
+</suite>
