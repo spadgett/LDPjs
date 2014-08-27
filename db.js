@@ -10,6 +10,7 @@ exports.init = function(env, callback) {
 	require('mongodb').connect(env.mongoURL, function(err, conn) {
 		db = conn;
 		exports.graphs = graphs();
+		console.log("Connected to MongoDB at: "+env.mongoURL);
 		// index the graph name for fast lookups
 		exports.graphs.ensureIndex({
 			name: 1
