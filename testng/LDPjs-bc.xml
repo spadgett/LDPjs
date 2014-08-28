@@ -20,11 +20,11 @@
     
     <!-- Default values to plug into Properties in the Earl Report  -->
     <parameter name="language" value = "JavaScript" />
-    <parameter name="homepage" value ="https://hub.jazz.net/project/sspeiche/LDPjs" />
-    <parameter name="assertor" value="http://stevespeicher.me" />
-    <parameter name="shortname" value="LDP.js Ref Impl" />
-    <parameter name="software" value="Reference Implementation" />
-    <parameter name="mbox" value="spadgett@us.ibm.com" />
+    <parameter name="homepage" value ="https://hub.jazz.net/project/sspeiche/LDPjs#bc" />
+    <parameter name="assertor" value="http://stevespeicher.me#self" />
+    <parameter name="shortname" value="LDP.js BC" />
+    <parameter name="software" value="LDP.js Reference Implementation" />
+    <parameter name="mail" value="spadgett@us.ibm.com" />
     <parameter name="developer" value="Sam Padgett" />
     <parameter name="description" value="Testing against: BasicContainer, RDFSource,Prefer, Container as Resource interaction model." />
     
@@ -46,9 +46,6 @@
 
             <run>
                 <include name="allRequirementLevels"/>
-
-                <!-- Include this group if your server supports non-RDF source resources -->
-                <exclude name="NON-RDF"/>
                 
                 <!-- Will just skip the tests but create entries for the reporters -->
                 <include name="MANUAL"/>
