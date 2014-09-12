@@ -22,6 +22,9 @@ define('membershipResource', ns + 'membershipResource');
 define('hasMemberRelation', ns + 'hasMemberRelation');
 define('isMemberOfRelation', ns + 'isMemberOfRelation');
 
+// Link relations
+define('constrainedBy', ns + 'constrainedBy');
+
 // Preferences
 define('PreferContainment', ns + 'PreferContainment');
 define('PreferMembership', ns + 'PreferMembership');

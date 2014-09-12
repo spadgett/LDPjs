@@ -22,10 +22,12 @@ module.exports = function(app, db, env) {
 	var resource = app.route(env.context + '*');
 	resource.all(function(req, res, next) {
 		// all responses should have Link: <ldp:Resource> rel=type
-		res.links({
-			type: ldp.Resource,
-			describedby: env.appBase + '/constraints.html'
-		});
+		var links = {
+			type: ldp.Resource
+		};
+		// also include implementation constraints
+		links[ldp.constrainedBy] = env.appBase + '/constraints.html';
+		res.links(links);
 		next();
 	});
 
