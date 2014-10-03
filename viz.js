@@ -71,12 +71,15 @@ module.exports = function(app, db, env) {
 					// generic LDP types like ldp:RDFSource
 					if (t.predicate === rdf.type &&
 							t.object !== ldp.Resource &&
-							t.object !== ldp.RDFSource &&
-							t.object !== ldp.Container) {
+							t.object !== ldp.RDFSource) {
 						if (!types[t.object]) {
 							types[t.object] = nextGroupIdx++;
 						}
 						jsonRes.nodes[nodes[subName]].group = types[t.object];
+						if (t.object === ldp.Container) {
+							jsonRes.nodes[nodes[subName]].img = 'folder.png';
+							console.log("Found a container " + subName);
+						}
 					}
 				});
 			});

@@ -32,19 +32,13 @@
 		alt="W3C" style="float: left;" /></a>
 
     <h1><a href="http://www.w3.org/2012/ldp/" title="LDP">Linked Data Platform</a> Reference Implementation</h1>
-
-	<blockquote><b>DISCLAIMER</b>: This service is provided as-is. It could go
-		down at any time and change without warning. In fact, it might have
-		already changed while you were reading this. The data behind this
-		services will get scrubbed periodically. If this service gets abused,
-		wse will either take it down or restrict access. Play nice.</blockquote>
-
-	<p>The implementation backing this is an experiment using Node.JS and
+    <h3>The implementation backing this is an experiment using Node.JS and
 	MongoDB, hosted on bluemix.net, to build and host an LDP reference
-	implementation. Enjoy.<p>
+	implementation. Enjoy.</h3>
 
     <div id="visualization"></div>
-
+    <div style='position: fixed; bottom: 5px; width: 100%'>
+    
     <div class="tabs">
         <a href="#" id="getTab" style="font-weight: bold;">GET</a> |
         <a href="#" id="putTab">PUT</a> |
@@ -108,6 +102,15 @@
 	        <div id="deleteResult" style="display: none;" class="message"></div>
         </form>
     </div>
+    
+    
+	<blockquote><b>DISCLAIMER</b>: This service is provided as-is. It could go
+		down at any time and change without warning. In fact, it might have
+		already changed while you were reading this. The data behind this
+		services will get scrubbed periodically. If this service gets abused,
+		we will either take it down or restrict access. Play nice.</blockquote>
+
+	</div>
 
     <script type="text/javascript">
         require(["dojo/_base/xhr",
@@ -258,7 +261,7 @@
             function visualize() {
                 dom.byId('visualization').innerHTML = '';
                 var width = Math.max(window.innerWidth - 50, 600),
-                    height = 400;
+                    height = 500;
 
                 var color = d3.scale.category20();
 
@@ -297,10 +300,22 @@
                             .attr("class", "node")
                             .call(force.drag);
 
-                        node.append("circle").attr("r", 5)
-                            .style("fill", function (d) {
-                                return color(d.group);
-                            })
+                       	node.append(
+                            function(n) {
+                                 if (!n.img) {
+                        		      return d3.select(this).append("circle").attr("r", 5)
+                            			    .style("fill", function (d) {
+                                			   return color(d.group);
+                            			     }).node();
+                                 } else { 
+	                        		 return d3.select(this).append("image")
+				                        .attr("xlink:href", n.img)
+				                        .attr("x", -8)
+				                        .attr("y", -8)
+				                        .attr("width", 16)
+				                        .attr("height", 16).node();
+                                 }
+                        });
 
                         node.append("text")
                             .attr("x", 12)
@@ -359,6 +374,8 @@
             });
         });
     </script>
+    
+    
 
 </body>
 
