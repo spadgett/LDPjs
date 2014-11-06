@@ -14,6 +14,11 @@
  * limitations under the License.
  */
 
+/*
+ * Looks at environment variables for app configuration (base URI, port, LDP
+ * context, etc.), falling back to what's in confg.json.
+ */
+
 var url = require("url");
 var config = require('./config.json');
 

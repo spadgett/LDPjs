@@ -14,6 +14,10 @@
  * limitations under the License.
  */
 
+/*
+ * Parses and serializes Turtle (text/turtle) using N3.js.
+ */
+
 var N3 = require('n3');
 var url = require('url');
 var path = require('path');

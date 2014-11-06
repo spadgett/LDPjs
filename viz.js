@@ -14,6 +14,11 @@
  * limitations under the License.
  */
 
+/*
+ * Transform the data in the RDF store to the JSON format for a D3.js
+ * force-directed graph (see public/index.html).
+ */
+
 module.exports = function(app, db, env) {
 	var rdf = require('./vocab/rdf.js');
 	var ldp = require('./vocab/ldp.js');

@@ -14,13 +14,17 @@
  * limitations under the License.
  */
 
+/*
+ * service.js handles HTTP requests for LDP resources.
+ */
+
 module.exports = function(app, db, env) {
 	var ldp = require('./vocab/ldp.js'); // LDP vocabulary
 	var rdf = require('./vocab/rdf.js'); // RDF vocabulary
-	var media = require('./media.js');	// media types
+	var media = require('./media.js'); // media types
 	var turtle = require('./turtle.js');
 	var jsonld = require('./jsonld.js');
-	var crypto = require('crypto');	// for MD5 (ETags)
+	var crypto = require('crypto'); // for MD5 (ETags)
 
 	// create root container if it doesn't exist
 	db.get(env.ldpBase, function(err, document) {
@@ -34,7 +38,7 @@ module.exports = function(app, db, env) {
 		}
 	});
 
-	// route any requests matching /r/*
+	// route any requests matching the LDP context (defaults to /r/*)
 	var resource = app.route(env.context + '*');
 	resource.all(function(req, res, next) {
 		// all responses should have Link: <ldp:Resource> rel=type

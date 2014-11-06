@@ -14,6 +14,11 @@
  * limitations under the License.
  */
 
+/*
+ * Initializes MongoDB and starts the app. The main application logic is in
+ * service.js.
+ */
+
 var express = require('express');
 var env = require('./env.js');
 

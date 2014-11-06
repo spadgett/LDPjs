@@ -14,6 +14,30 @@
  * limitations under the License.
  */
 
+
+/*
+ * db.js stores RDF graphs in MongoDB. Documents can have the following
+ * properties.
+ *
+ * All resources:
+ *
+ *   name - the URI of the graph
+ *   interactionModel - the URI indicating the LDP interaction model of the resource
+ *   container - the container for this resource
+ *   deleted - boolean indicating if the resource has been deleted (to avoid reusing URIs)
+ *   triples - an array of RDF triples in N3.js format
+ *
+ * Direct containers:
+ *
+ *   membershipResource - the ldp:membershipResource property
+ *   hasMemberRelation - the ldp:hasMemberRelation property
+ *   isMemberOfRelation - the ldp:isMemberOfRelation property
+ *
+ * Membership resources:
+ *
+ *   membershipResourceFor - the associated direct container (always 1:1)
+ */
+
 var ldp = require('./vocab/ldp.js'); // LDP vocabulary
 
 var db;

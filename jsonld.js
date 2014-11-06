@@ -14,6 +14,11 @@
  * limitations under the License.
  */
 
+/*
+ * Parses and serializes JSON-LD (application/ld+json) to and from an array of
+ * triples, the triple format used by N3.js.
+ */
+
 var N3 = require('n3');
 var jsonld = require('jsonld');
 var media = require('./media.js');				// media types
