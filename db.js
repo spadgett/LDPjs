@@ -16,10 +16,11 @@
 
 
 /*
- * db.js stores RDF graphs in MongoDB. Documents can have the following
- * properties.
+ * db.js stores RDF graphs in MongoDB. Each document representations
+ * an RDF graph. Documents have the properties below. The 'triples'
+ * property is the RDF. Other properties are metadata.
  *
- * All resources:
+ * All documents:
  *
  *   name - the URI of the graph
  *   interactionModel - the URI indicating the LDP interaction model of the resource
@@ -36,6 +37,11 @@
  * Membership resources:
  *
  *   membershipResourceFor - the associated direct container (always 1:1)
+ *
+ * Rather than storing a link to all of its members in the container,
+ * we have a property in each resource that points back to its
+ * container. On a container GET, we query for a container's resources
+ * and mix in containment triples.
  */
 
 var ldp = require('./vocab/ldp.js'); // LDP vocabulary
