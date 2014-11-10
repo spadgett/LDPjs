@@ -52,24 +52,34 @@ function graphs() {
 	return db.collection('graphs');
 }
 
+// index the graph name for fast lookups and uniqueness
+function ensureIndex() {
+	graphs().ensureIndex({
+		name: 1
+	}, {
+		unique: true
+	}, function(err) {
+		if (err) {
+			// not fatal, but log the error
+			console.log(err.stack);
+		}
+	});
+}
+
 exports.init = function(env, callback) {
 	require('mongodb').connect(env.mongoURL, function(err, conn) {
 		db = conn;
 		exports.graphs = graphs();
 		console.log("Connected to MongoDB at: "+env.mongoURL);
-		// index the graph name for fast lookups
-		exports.graphs.ensureIndex({
-			name: 1
-		}, {
-			unique: true
-		}, function(err) {
-			if (err) {
-				// not fatal, but log the error
-				console.log(err.stack);
-			}
-		});
+		ensureIndex();
 		callback(err);
 	});
+};
+
+exports.drop = function(callback) {
+	graphs().drop(callback);
+	ensureIndex();
+	exports.graphs = graphs();
 };
 
 exports.reserveURI = function(uri, callback) {

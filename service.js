@@ -34,7 +34,11 @@ module.exports = function(app, db, env) {
 		}
 
 		if (!document || document.deleted) {
-			createRootContainer();
+			createRootContainer(function(err) {
+				if (err) {
+					console.log(err.stack);
+				}
+			});
 		}
 	});
 
@@ -135,6 +139,26 @@ module.exports = function(app, db, env) {
 	resource.head(function(req, res, next) {
 		console.log('HEAD ' + req.path);
 		get(req, res, false);
+	});
+
+	// allow dropping the database using DELETE /db
+	// not recommended for production servers ;)
+	app.delete('/db', function(req, res, next) {
+		db.drop(function(err) {
+			if (err) {
+				console.log(err.stack);
+				res.send(500);
+			} else {
+				createRootContainer(function(err) {
+					if (err) {
+						console.log(err.stack);
+						res.send(500);
+					}
+
+					res.send(204);
+				});
+			}
+		});
 	});
 
 	function putUpdate(req, res, document, newTriples, serialize) {
@@ -421,7 +445,7 @@ module.exports = function(app, db, env) {
 	});
 
 	// creates a root container on first run
-	function createRootContainer() {
+	function createRootContainer(callback) {
 		var triples = [{
 			subject: env.ldpBase,
 			predicate: rdf.type,
@@ -449,11 +473,7 @@ module.exports = function(app, db, env) {
 			interactionModel: ldp.BasicContainer,
 			triples: triples,
 			deleted: false
-		}, function(err) {
-			if (err) {
-				console.log(err.stack);
-			}
-		});
+		}, callback);
 	}
 
 	// create a membership resource for the container if it's a direct
