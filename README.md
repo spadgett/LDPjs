@@ -5,8 +5,6 @@ Platform](http://www.w3.org/2012/ldp), leveraging Node.js,
 MongoDB, and a few other js libraries.  Catch it running at
 [http://ldpjs.mybluemix.net](http://ldpjs.mybluemix.net).
 
-## Capabilities
-
 LDP.js supports LDP basic and direct containers. Indirect
 containers and non-RDF source are not implemented.
 
@@ -20,7 +18,8 @@ To start the app, run these commands
     $ npm install
     $ node app.js
 
-Finally, point your browser to http://localhost:3000/.
+Finally, point your browser to
+[http://localhost:3000/](http://localhost:3000/).
 
 ## License
 
