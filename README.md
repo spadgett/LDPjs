@@ -5,6 +5,8 @@ Platform](http://www.w3.org/2012/ldp), leveraging Node.js,
 MongoDB, and a few other js libraries.  Catch it running at
 [http://ldpjs.mybluemix.net](http://ldpjs.mybluemix.net).
 
+![LDP.js Screenshot](screenshot.png "LDP.js Screenshot")
+
 LDP.js supports LDP basic and direct containers. Indirect
 containers and non-RDF source are not implemented.
 
