@@ -22,8 +22,8 @@ module.exports = function(app, db, env) {
 	var ldp = require('./vocab/ldp.js'); // LDP vocabulary
 	var rdf = require('./vocab/rdf.js'); // RDF vocabulary
 	var media = require('./media.js'); // media types
-	var turtle = require('./turtle.js');
-	var jsonld = require('./jsonld.js');
+	var turtle = require('./turtle.js'); // text/turtle parsing and serialization
+	var jsonld = require('./jsonld.js'); // application/ld+json parsing and serialization
 	var crypto = require('crypto'); // for MD5 (ETags)
 
 	// create root container if it doesn't exist
@@ -70,6 +70,7 @@ module.exports = function(app, db, env) {
 				return;
 			}
 
+			// determine what format to serialize using the Accept header
 			var serialize;
 			if (req.accepts(media.turtle)) {
 				serialize = turtle.serialize;
@@ -80,7 +81,13 @@ module.exports = function(app, db, env) {
 				return;
 			}
 
+			// add common response headers
 			addHeaders(res, document);
+
+			// some triples like containment are calculated on-the-fly rather
+			// than being stored in the document
+			// insertCalculatedTriples also looks at the Prefer header to see
+			// what to include
 			insertCalculatedTriples(req, document, function(err, preferenceApplied) {
 				if (err) {
 					console.log(err.stack);
@@ -99,6 +106,7 @@ module.exports = function(app, db, env) {
 						res.set('Preference-Applied', 'return=representation');
 					}
 
+					// generate an ETag for the content
 					var eTag = getETag(content);
 					if (req.get('If-None-Match') === eTag) {
 						res.send(304);
@@ -204,6 +212,7 @@ module.exports = function(app, db, env) {
 
 		// check if the client requested a specific interaction model through a
 		// Link header.  if so, override what we found from the RDF content.
+		// FIXME: look for Link type=container as well
 		if (hasResourceLink(req)) {
 			document.interactionModel = ldp.RDFSource;
 		}
@@ -327,6 +336,7 @@ module.exports = function(app, db, env) {
 
 					// check if the client requested a specific interaction model through a Link header
 					// if so, override what we found from the RDF content
+					// FIXME: look for Link type=container as well
 					if (hasResourceLink(req)) {
 						document.interactionModel = ldp.RDFSource;
 					}
@@ -410,6 +420,7 @@ module.exports = function(app, db, env) {
 		});
 	});
 
+	// creates a root container on first run
 	function createRootContainer() {
 		var triples = [{
 			subject: env.ldpBase,
@@ -458,10 +469,13 @@ module.exports = function(app, db, env) {
 		}
 	}
 
+	// generate an ETag for a response using an MD5 hash
+	// note: insert any calculated triples before calling getETag()
 	function getETag(content) {
 		return 'W/"' + crypto.createHash('md5').update(content).digest('hex') + '"';
 	}
 
+	// add common headers to all responses
 	function addHeaders(res, document) {
 		var allow = 'GET,HEAD,DELETE,OPTIONS';
 		if (isContainer(document)) {
@@ -477,6 +491,9 @@ module.exports = function(app, db, env) {
 		res.set('Allow', allow);
 	}
 
+	// checks if document represents a basic or direct container
+	// this is set using document.interactionModel and can't be changed
+	// we don't look at the RDF type
 	function isContainer(document) {
 		return document.interactionModel === ldp.BasicContainer || document.interactionModel === ldp.DirectContainer;
 	}
@@ -649,6 +666,9 @@ module.exports = function(app, db, env) {
 		});
 	}
 
+	// append 'path' to the end of a uri
+	// - any query or hash in the uri is removed
+	// - any special characters like / and ? in 'path' are replaced
 	function addPath(uri, path) {
 		uri = uri.split("?")[0].split("#")[0];
 		if (uri.substr(-1) !== '/') {
@@ -660,6 +680,7 @@ module.exports = function(app, db, env) {
 		return uri + encodeURIComponent(lastSegment);
 	}
 
+	// generates and reserves a unique URI with base URI 'container'
 	function uniqueURI(container, callback) {
 		var candidate = addPath(container, 'res' + Date.now());
 		db.reserveURI(candidate, function(err) {
@@ -667,6 +688,8 @@ module.exports = function(app, db, env) {
 		});
 	}
 
+	// reserves a unique URI for a new resource. will use slug if available,
+	// but falls back to the usual naming scheme if slug is already used
 	function assignURI(container, slug, callback) {
 		if (slug) {
 			var candidate = addPath(container, slug);
@@ -682,6 +705,9 @@ module.exports = function(app, db, env) {
 		}
 	}
 
+	// removes any membership triples from a membership resource before updating
+	// it in the database
+	// membership triples are not stored with the resource itself (see db.js)
 	function removeMembership(document) {
 		if (document.membershipResourceFor) {
 			// find the member relations. handle the case where the resource is
@@ -702,6 +728,8 @@ module.exports = function(app, db, env) {
 		}
 	}
 
+	// look for a Link request header indicating the entity uses a ldp:Resource
+	// interaction model rather than container
 	function hasResourceLink(req) {
 		var link = req.get('Link');
 		// look for links like
