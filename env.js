@@ -92,7 +92,7 @@ if (process.env.LDP_BASE) {
 // MongoDB
 if (process.env.VCAP_SERVICES) {
 	var env = JSON.parse(process.env.VCAP_SERVICES);
-	exports.mongoURL = env['mongodb-2.2'][0].credentials.url;
+	exports.mongoURL = env['mongodb-2.4'][0].credentials.url;
 } else {
 	exports.mongoURL = process.env.MONGO_URL || config.mongoURL;
 }
