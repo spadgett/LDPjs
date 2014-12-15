@@ -53,7 +53,8 @@ app.use(function(req, res, next) {
 var db = require('./db.js');
 db.init(env, function(err) {
 	if (err) {
-		console.log(err);
+		console.error(err);
+		console.error("Can't initialize MongoDB.");
 	} else {
 		require('./service.js')(app, db, env);
 		require('./viz.js')(app, db, env);
