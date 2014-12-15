@@ -70,13 +70,14 @@ exports.init = function(env, callback) {
 	require('mongodb').connect(env.mongoURL, function(err, conn) {
 		if (err) {
 			callback(err);
+			return;
 		}
 
 		db = conn;
 		exports.graphs = graphs();
 		console.log("Connected to MongoDB at: "+env.mongoURL);
 		ensureIndex();
-		callback(err);
+		callback();
 	});
 };
 
