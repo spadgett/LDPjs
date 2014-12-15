@@ -68,6 +68,10 @@ function ensureIndex() {
 
 exports.init = function(env, callback) {
 	require('mongodb').connect(env.mongoURL, function(err, conn) {
+		if (err) {
+			callback(err);
+		}
+
 		db = conn;
 		exports.graphs = graphs();
 		console.log("Connected to MongoDB at: "+env.mongoURL);
