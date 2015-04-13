@@ -23,10 +23,10 @@ var url = require("url");
 var config = require('./config.json');
 
 // the IP address of the Cloud Foundry DEA (Droplet Execution Agent) that hosts this application:
-exports.listenHost = (process.env.VCAP_APP_HOST || config.host);
+exports.listenHost = (process.env.VCAP_APP_HOST || process.env.OPENSHIFT_NODEJS_IP || config.host);
 
 // the port on the DEA for communication with the application:
-exports.listenPort = (process.env.VCAP_APP_PORT || config.port);
+exports.listenPort = (process.env.VCAP_APP_PORT || process.env.OPENSHIFT_NODEJS_PORT || config.port);
 
 function addSlash(url) {
 	if (url.substr(-1) == '/') {
@@ -94,5 +94,9 @@ if (process.env.VCAP_SERVICES) {
 	var env = JSON.parse(process.env.VCAP_SERVICES);
 	exports.mongoURL = env.mongolab[0].credentials.uri;
 } else {
-	exports.mongoURL = process.env.MONGO_URL || config.mongoURL;
+	if (process.env.OPENSHIFT_MONGODB_DB_URL) {
+		exports.mongoURL = process.env.OPENSHIFT_MONGODB_DB_URL;
+	} else {
+		exports.mongoURL = process.env.MONGO_URL || config.mongoURL;
+	}
 }

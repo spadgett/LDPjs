@@ -10,6 +10,11 @@
 	},
 	"engines": {
 		"node": "0.10.26"
+
+	},
+	"scripts": {  
+	   "start": "node app.js"
 	},
 	"repository": {}
+
 }
