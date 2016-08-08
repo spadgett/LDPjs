@@ -60,17 +60,17 @@ module.exports = function(app, db, env) {
 		db.get(req.fullURL, function(err, document) {
 			if (err) {
 				console.log(err.stack);
-				res.send(500);
+				res.sendStatus(500);
 				return;
 			}
 
 			if (!document) {
-				res.send(404);
+				res.sendStatus(404);
 				return;
 			}
 
 			if (document.deleted) {
-				res.send(410);
+				res.sendStatus(410);
 				return;
 			}
 
@@ -81,7 +81,7 @@ module.exports = function(app, db, env) {
 			} else if (req.accepts(media.jsonld) || req.accepts(media.json)) {
 				serialize = jsonld.serialize;
 			} else {
-				res.send(406);
+				res.sendStatus(406);
 				return;
 			}
 
@@ -95,14 +95,14 @@ module.exports = function(app, db, env) {
 			insertCalculatedTriples(req, document, function(err, preferenceApplied) {
 				if (err) {
 					console.log(err.stack);
-					res.send(500);
+					res.sendStatus(500);
 					return;
 				}
 
 				serialize(document.triples, function(err, contentType, content) {
 					if (err) {
 						console.log(err.stack);
-						res.send(500);
+						res.sendStatus(500);
 						return;
 					}
 
@@ -113,7 +113,7 @@ module.exports = function(app, db, env) {
 					// generate an ETag for the content
 					var eTag = getETag(content);
 					if (req.get('If-None-Match') === eTag) {
-						res.send(304);
+						res.sendStatus(304);
 						return;
 					}
 
@@ -147,15 +147,15 @@ module.exports = function(app, db, env) {
 		db.drop(function(err) {
 			if (err) {
 				console.log(err.stack);
-				res.send(500);
+				res.sendStatus(500);
 			} else {
 				createRootContainer(function(err) {
 					if (err) {
 						console.log(err.stack);
-						res.send(500);
+						res.sendStatus(500);
 					}
 
-					res.send(204);
+					res.sendStatus(204);
 				});
 			}
 		});
@@ -163,13 +163,13 @@ module.exports = function(app, db, env) {
 
 	function putUpdate(req, res, document, newTriples, serialize) {
 		if (isContainer(document)) {
-			res.set('Allow', 'GET,HEAD,DELETE,OPTIONS,POST').send(405);
+			res.set('Allow', 'GET,HEAD,DELETE,OPTIONS,POST').sendStatus(405);
 			return;
 		}
 
 		var ifMatch = req.get('If-Match');
 		if (!ifMatch) {
-			res.send(428);
+			res.sendStatus(428);
 			return;
 		}
 
@@ -177,7 +177,7 @@ module.exports = function(app, db, env) {
 		insertCalculatedTriples(null, document, function(err) {
 			if (err) {
 				console.log(err.stack);
-				res.send(500);
+				res.sendStatus(500);
 				return;
 			}
 
@@ -191,13 +191,13 @@ module.exports = function(app, db, env) {
 			serialize(document.triples, function(err, contentType, content) {
 				if (err) {
 					console.log(err.stack);
-					res.send(500);
+					res.sendStatus(500);
 					return;
 				}
 
 				var eTag = getETag(content);
 				if (ifMatch !== eTag) {
-					res.send(412);
+					res.sendStatus(412);
 					return;
 				}
 
@@ -217,11 +217,11 @@ module.exports = function(app, db, env) {
 				db.put(document, function(err) {
 					if (err) {
 						console.log(err.stack);
-						res.send(500);
+						res.sendStatus(500);
 						return;
 					}
 
-					res.send(204);
+					res.sendStatus(204);
 				});
 			});
 		});
@@ -243,14 +243,14 @@ module.exports = function(app, db, env) {
 
 		// check the membership triple pattern if this is a direct container
 		if (!isMembershipPatternValid(document)) {
-			res.send(409);
+			res.sendStatus(409);
 			return;
 		}
 
 		db.put(document, function(err) {
 			if (err) {
 				console.log(err.stack);
-				res.send(500);
+				res.sendStatus(500);
 				return;
 			}
 
@@ -259,11 +259,11 @@ module.exports = function(app, db, env) {
 				if (err) {
 					console.log(err.stack);
 					db.releaseURI(loc);
-					res.send(500);
+					res.sendStatus(500);
 					return;
 				}
 
-				res.send(201);
+				res.sendStatus(201);
 			});
 		});
 	}
@@ -278,13 +278,13 @@ module.exports = function(app, db, env) {
 			parse = jsonld.parse;
 			serialize = jsonld.serialize;
 		} else {
-			res.send(415);
+			res.sendStatus(415);
 			return;
 		}
 
 		parse(req, req.fullURL, function(err, newTriples) {
 			if (err) {
-				res.send(400);
+				res.sendStatus(400);
 				return;
 			}
 
@@ -292,12 +292,12 @@ module.exports = function(app, db, env) {
 			db.get(req.fullURL, function(err, document) {
 				if (err) {
 					console.log(err.stack);
-					res.send(500);
+					res.sendStatus(500);
 				}
 
 				if (document) {
 					if (document.deleted) {
-						res.send(410);
+						res.sendStatus(410);
 						return;
 					}
 
@@ -315,12 +315,12 @@ module.exports = function(app, db, env) {
 		db.findContainer(req.fullURL, function(err, container) {
 			if (err) {
 				console.log(err.stack);
-				res.send(500);
+				res.sendStatus(500);
 				return;
 			}
 
 			if (!container) {
-				res.set('Allow', 'GET,HEAD,PUT,DELETE,OPTIONS').send(405);
+				res.set('Allow', 'GET,HEAD,PUT,DELETE,OPTIONS').sendStatus(405);
 				return;
 			}
 
@@ -330,14 +330,14 @@ module.exports = function(app, db, env) {
 			} else if (req.is(media.jsonld) || req.is(media.json)) {
 				parse = jsonld.parse;
 			} else {
-				res.send(415);
+				res.sendStatus(415);
 				return;
 			}
 
 			assignURI(req.fullURL, req.get('Slug'), function(err, loc) {
 				if (err) {
 					console.log(err.stack);
-					res.send(500);
+					res.sendStatus(500);
 					return;
 				}
 
@@ -345,7 +345,7 @@ module.exports = function(app, db, env) {
 					if (err) {
 						// allow the URI to be used again
 						db.releaseURI(loc);
-						res.send(400);
+						res.sendStatus(400);
 						return;
 					}
 
@@ -368,7 +368,7 @@ module.exports = function(app, db, env) {
 					// check the membership triple pattern if this is a direct container
 					if (!isMembershipPatternValid(document)) {
 						db.releaseURI(loc);
-						res.send(409);
+						res.sendStatus(409);
 						return;
 					}
 
@@ -387,7 +387,7 @@ module.exports = function(app, db, env) {
 						if (err) {
 							console.log(err.stack);
 							db.releaseURI(loc);
-							res.send(500);
+							res.sendStatus(500);
 							return;
 						}
 
@@ -396,11 +396,11 @@ module.exports = function(app, db, env) {
 							if (err) {
 								console.log(err.stack);
 								db.releaseURI(loc);
-								res.send(500);
+								res.sendStatus(500);
 								return;
 							}
 
-							res.location(loc).send(201);
+							res.location(loc).sendStatus(201);
 						});
 					});
 				});
@@ -413,11 +413,11 @@ module.exports = function(app, db, env) {
 		db.remove(req.fullURL, function(err, result) {
 			if (err) {
 				console.log(err.stack);
-				res.send(500);
+				res.sendStatus(500);
 				return;
 			}
 
-			res.send(result ? 204 : 404);
+			res.sendStatus(result ? 204 : 404);
 		});
 	});
 
@@ -425,22 +425,22 @@ module.exports = function(app, db, env) {
 		db.get(req.fullURL, function(err, document) {
 			if (err) {
 				console.log(err.stack);
-				res.send(500);
+				res.sendStatus(500);
 				return;
 			}
 
 			if (!document) {
-				res.send(404);
+				res.sendStatus(404);
 				return;
 			}
 
 			if (document.deleted) {
-				res.send(410);
+				res.sendStatus(410);
 				return;
 			}
 
 			addHeaders(res, document);
-			res.send(200);
+			res.sendStatus(200);
 		});
 	});
 
